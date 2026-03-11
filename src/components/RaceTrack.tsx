@@ -618,8 +618,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
                         {is3rd && <span className="mr-0.5 text-[9px]">🥉</span>}
                         <span className={`truncate inline-block
                           ${participants.length >= 11
-                            ? "max-w-[56px] sm:max-w-[80px] text-[8px] sm:text-[10px]"
-                            : "max-w-[72px] sm:max-w-[96px] text-[9px] sm:text-[11px]"
+                            ? "max-w-[72px] sm:max-w-[100px] text-[8px] sm:text-[10px]"
+                            : "max-w-[88px] sm:max-w-[120px] text-[9px] sm:text-[11px]"
                           }`}>
                           {name}
                         </span>

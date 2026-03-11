@@ -74,10 +74,26 @@ export default function ParticipantInput({ onStart }: Props) {
   }
 
   function handleShuffle() {
-    // 원래 구분자를 감지하여 유지
-    const delimiter = text.includes(",") ? ", " : text.includes("\t") ? "\t" : "\n";
-    const shuffled = [...names].sort(() => Math.random() - 0.5);
-    setText(shuffled.join(delimiter));
+    // 원본 구분자 레이아웃을 보존하며 이름만 셔플
+    const tokens = text.split(/([\n,\t]+)/);
+    const nameTokens: string[] = [];
+    const delimiters: string[] = [];
+    for (let i = 0; i < tokens.length; i++) {
+      if (i % 2 === 0) nameTokens.push(tokens[i]);
+      else delimiters.push(tokens[i]);
+    }
+    // Fisher-Yates shuffle
+    const shuffled = [...nameTokens];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    let result = "";
+    for (let i = 0; i < shuffled.length; i++) {
+      result += shuffled[i];
+      if (i < delimiters.length) result += delimiters[i];
+    }
+    setText(result);
   }
 
   function handleClear() {

@@ -143,8 +143,11 @@ export function createRaceEngine(config: RaceConfig) {
 
         if (!isWinner && inFinalPhase) {
           const winnerPos = positions[predeterminedWinner];
-          if (positions[i] > winnerPos + 0.5) {
-            movement *= 0.85;
+          const lead = positions[i] - winnerPos;
+          if (lead > 0.5) {
+            // 앞서는 정도에 비례하여 부드럽게 감속 (급격한 차단 대신 점진적)
+            const dampFactor = Math.max(0.92, 1 - (lead - 0.5) / 60);
+            movement *= dampFactor;
           }
         }
 
@@ -198,18 +201,21 @@ export function createRaceEngine(config: RaceConfig) {
       finishOrder.push(predeterminedWinner);
     }
 
-    // 나머지: 현재 위치(가중치 85%) + 랜덤(15%)으로 순서 결정
-    // 초반 스킵 시에도 레이스 흐름과 일관된 결과를 보장
+    // 나머지: 현재 위치(50%) + 랜덤(50%)으로 순서 결정
+    // 스킵 타이밍에 따른 조작 가능성을 줄이기 위해 랜덤 비중을 높임
     const remaining: { index: number; score: number }[] = [];
     for (let i = 0; i < participantCount; i++) {
       if (!finishedSet.has(i)) {
-        remaining.push({ index: i, score: positions[i] * 0.85 + Math.random() * positions[i] * 0.15 + Math.random() * 3 });
+        remaining.push({ index: i, score: positions[i] * 0.5 + Math.random() * 50 });
       }
     }
     remaining.sort((a, b) => b.score - a.score);
 
-    for (const r of remaining) {
-      positions[r.index] = 100;
+    // 순위별 위치 분산 — 결승선에 뭉치지 않도록
+    for (let j = 0; j < remaining.length; j++) {
+      const r = remaining[j];
+      const rank = finishOrder.length; // 현재까지의 총 순위 (0-based)
+      positions[r.index] = Math.max(55, 100 - rank * 3);
       finishedSet.add(r.index);
       finishOrder.push(r.index);
     }
