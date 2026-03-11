@@ -44,10 +44,10 @@ function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number
 
 /** 참가자 수에 따라 레인 높이 계산 (px) */
 function getLaneHeight(count: number, isDesktop: boolean): number {
-  if (count <= 4) return isDesktop ? 80 : 68;
-  if (count <= 6) return isDesktop ? 72 : 62;
-  if (count <= 8) return isDesktop ? 64 : 56;
-  return isDesktop ? 56 : 52; // 9-10명 — 모바일 최소 52px 보장
+  if (count <= 4) return isDesktop ? 76 : 60;
+  if (count <= 6) return isDesktop ? 66 : 52;
+  if (count <= 8) return isDesktop ? 58 : 46;
+  return isDesktop ? 52 : 42; // 9-10명
 }
 
 export default function RaceTrack({ participants, onReset }: Props) {
@@ -215,7 +215,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   // 레인 높이 (참가자 수에 따라 유동)
   const laneHeightMobile = getLaneHeight(participants.length, false);
   const laneHeightDesktop = getLaneHeight(participants.length, true);
-  const snailSize = participants.length >= 9 ? 32 : 38;
+  const snailSize = participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
@@ -254,8 +254,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
           </span>
         </div>
 
-        {/* Lanes area — scrollable on small screens with many participants */}
-        <div className="bg-[#4a8c3f] max-h-[65vh] overflow-y-auto" ref={trackRef}>
+        {/* Lanes area */}
+        <div className="bg-[#4a8c3f]" ref={trackRef}>
           {participants.map((name, index) => {
             const isWinner = showResult && raceState?.winnerId === index;
             const isEven = index % 2 === 0;
