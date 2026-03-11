@@ -108,7 +108,7 @@ export default function ParticipantInput({ onStart }: Props) {
               alt="SNAIL RACE 로고"
               width={120}
               height={120}
-              className="drop-shadow-md"
+              className=""
               priority
             />
           </div>
