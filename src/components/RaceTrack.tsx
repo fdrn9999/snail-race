@@ -66,13 +66,82 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const dustRefs = useRef<(HTMLDivElement | null)[]>([]);
   const frameCountRef = useRef(0);
   const prevFinishCountRef = useRef(0);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const bgmFadeRef = useRef<number>(0);
+  const [bgmMuted, setBgmMuted] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("snailrace-bgm-muted") === "1";
+    }
+    return false;
+  });
 
   const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
+
+  const stopBgm = useCallback(() => {
+    cancelAnimationFrame(bgmFadeRef.current);
+    const audio = bgmRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, []);
+
+  const fadeOutBgm = useCallback((durationMs: number) => {
+    const audio = bgmRef.current;
+    if (!audio) return;
+    const startVol = audio.volume;
+    const startTime = performance.now();
+    const fade = (now: number) => {
+      const progress = Math.min((now - startTime) / durationMs, 1);
+      audio.volume = Math.max(0, startVol * (1 - progress));
+      if (progress < 1) {
+        bgmFadeRef.current = requestAnimationFrame(fade);
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    };
+    bgmFadeRef.current = requestAnimationFrame(fade);
+  }, []);
+
+  const playBgm = useCallback(() => {
+    stopBgm();
+    if (bgmMuted) return;
+    const audio = new Audio("/music/racing.mp3");
+    audio.volume = 0.5;
+    bgmRef.current = audio;
+    audio.play().catch(() => {/* autoplay blocked — silent fail */});
+  }, [stopBgm, bgmMuted]);
+
+  const toggleBgm = useCallback(() => {
+    setBgmMuted((prev) => {
+      const next = !prev;
+      localStorage.setItem("snailrace-bgm-muted", next ? "1" : "0");
+      if (next) {
+        // 음소거 — 재생 중이면 즉시 정지
+        const audio = bgmRef.current;
+        if (audio && !audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      } else {
+        // 음소거 해제 — 레이스 중이면 재생 시작
+        if (isRacing) {
+          const audio = new Audio("/music/racing.mp3");
+          audio.volume = 0.5;
+          bgmRef.current = audio;
+          audio.play().catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, [isRacing]);
 
   const cleanup = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     if (countIntervalRef.current) clearInterval(countIntervalRef.current);
-  }, []);
+    stopBgm();
+  }, [stopBgm]);
 
   const fireConfetti = useCallback(() => {
     const end = Date.now() + 3500;
@@ -118,6 +187,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const handleSkip = useCallback(() => {
     if (!engineRef.current || !isRacing) return;
     cancelAnimationFrame(animFrameRef.current);
+    fadeOutBgm(500);
 
     const engine = engineRef.current;
     const state = engine.skipToEnd();
@@ -146,7 +216,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     setRaceState(engine.snapshot());
     setIsRacing(false);
     setTimeout(() => fireConfetti(), 300);
-  }, [isRacing, fireConfetti, participants.length]);
+  }, [isRacing, fireConfetti, fadeOutBgm, participants.length]);
 
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
@@ -186,6 +256,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         setIsRacing(true);
         startTimeRef.current = performance.now();
+        playBgm();
 
         const animate = (timestamp: number) => {
           let elapsed = timestamp - startTimeRef.current;
@@ -229,10 +300,18 @@ export default function RaceTrack({ participants, onReset }: Props) {
             setRaceState(engine.snapshot());
           }
 
+          // BGM 페이드아웃: 종료 2초 전부터 시작
+          const remaining = RACE_DURATION - elapsed;
+          if (remaining <= 2000 && bgmRef.current && bgmRef.current.volume > 0.01) {
+            const ratio = Math.max(0, remaining / 2000);
+            bgmRef.current.volume = 0.5 * ratio;
+          }
+
           if (!state.finished) {
             animFrameRef.current = requestAnimationFrame(animate);
           } else {
             setIsRacing(false);
+            stopBgm();
             for (let i = 0; i < participants.length; i++) {
               const slimeEl = slimeRefs.current[i];
               if (slimeEl) slimeEl.style.display = "none";
@@ -245,7 +324,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         animFrameRef.current = requestAnimationFrame(animate);
       }
     }, 1000);
-  }, [participants, fireConfetti, updateEffects]);
+  }, [participants, fireConfetti, updateEffects, playBgm, stopBgm]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -309,13 +388,34 @@ export default function RaceTrack({ participants, onReset }: Props) {
       <div className="shrink-0 mb-1 sm:mb-2">
         {/* 풀 타이틀: 레이스 전/후에만 표시 */}
         {!isRacing && countdown === null && !raceFinished && (
-          <div className="text-center mb-3">
+          <div className="text-center mb-3 relative">
             <h1 className="font-heading text-2xl sm:text-3xl font-bold text-clay-text tracking-tight">
               달팽이 레이싱
             </h1>
             <p className="font-body text-clay-muted text-sm mt-1">
               {participants.length}명 참가
             </p>
+            {/* BGM 토글 */}
+            <button
+              type="button"
+              onClick={toggleBgm}
+              className="absolute right-0 top-1/2 -translate-y-1/2
+                         w-8 h-8 flex items-center justify-center rounded-xl
+                         bg-clay-lilac/40 border-2 border-clay-border/15
+                         text-clay-muted hover:text-clay-text hover:bg-clay-lilac/60
+                         transition-colors duration-150 cursor-pointer"
+              aria-label={bgmMuted ? "배경음악 켜기" : "배경음악 끄기"}
+            >
+              {bgmMuted ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5 6 9H2v6h4l5 4V5z" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                </svg>
+              )}
+            </button>
           </div>
         )}
 
@@ -323,19 +423,39 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {(countdown !== null || isRacing || raceFinished) && (
           <div>
             {/* 한 줄 타이틀 */}
-            <div className="text-center mb-1.5">
+            <div className="flex items-center justify-center gap-2 mb-1.5">
               <span className="font-heading text-sm sm:text-base font-bold text-clay-text">
                 달팽이 레이싱
               </span>
-              <span className="font-body text-clay-muted text-xs ml-2">
+              <span className="font-body text-clay-muted text-xs">
                 {participants.length}명
               </span>
               {raceState && (
-                <span className={`font-heading font-bold text-[10px] sm:text-xs ml-2 uppercase tracking-wide
+                <span className={`font-heading font-bold text-[10px] sm:text-xs uppercase tracking-wide
                   ${raceFinished ? "text-clay-success" : "text-clay-muted/60"}`}>
                   {raceFinished ? "완료" : "진행 중"}
                 </span>
               )}
+              {/* BGM 토글 (컴팩트) */}
+              <button
+                type="button"
+                onClick={toggleBgm}
+                className="w-6 h-6 flex items-center justify-center rounded-lg
+                           bg-clay-lilac/30 border border-clay-border/10
+                           text-clay-muted hover:text-clay-text
+                           transition-colors duration-150 cursor-pointer"
+                aria-label={bgmMuted ? "배경음악 켜기" : "배경음악 끄기"}
+              >
+                {bgmMuted ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 5 6 9H2v6h4l5 4V5z" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                  </svg>
+                )}
+              </button>
             </div>
 
             {/* ═══ 슬림 순위 스트립 ═══ */}
