@@ -21,7 +21,7 @@ const RACE_DURATION = 10000;
 /* ── SVG Snail (cartoon) ── */
 function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: "scaleX(-1)" }} aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: "scaleX(-1)", filter: "drop-shadow(1px 2px 2px rgba(0,0,0,0.35))" }} aria-hidden="true">
       <ellipse cx="32" cy="46" rx="28" ry="10" fill="#FFD993" stroke="#C68B3E" strokeWidth="2" />
       <ellipse cx="28" cy="44" rx="18" ry="5" fill="#FFE8B8" opacity="0.6" />
       <circle cx="36" cy="30" r="18" fill={shellColor} stroke="#2D3436" strokeWidth="2.5" />
@@ -60,6 +60,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const [resultMinimized, setResultMinimized] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showGo, setShowGo] = useState(false);
+  const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(false);
   const engineRef = useRef<ReturnType<typeof createRaceEngine> | null>(null);
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -127,11 +128,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
     if (!engineRef.current || !isRacing) return;
     cancelAnimationFrame(animFrameRef.current);
 
+    const engine = engineRef.current;
     let t = lastTimestamp.current;
-    let state = engineRef.current.update(t);
+    let state = engine.update(t);
     while (!state.finished) {
       t += 16.67;
-      state = engineRef.current.update(t);
+      state = engine.update(t);
     }
 
     const trackEl = trackRef.current;
@@ -152,7 +154,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       if (dustEl) dustEl.style.display = "none";
     }
 
-    setRaceState(state);
+    setRaceState(engine.snapshot());
     setIsRacing(false);
     setTimeout(() => {
       setShowResult(true);
@@ -220,7 +222,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
           if (finishChanged || frameCountRef.current % 5 === 0 || state.finished) {
             prevFinishCountRef.current = state.finishOrder.length;
-            setRaceState(state);
+            setRaceState(engine.snapshot());
           }
 
           if (!state.finished) {
@@ -270,6 +272,32 @@ export default function RaceTrack({ participants, onReset }: Props) {
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
       {/* CSS-only 반응형 레인 높이 (hydration-safe) */}
       <style>{`.race-lane{height:${laneHeightMobile}px}@media(min-width:640px){.race-lane{height:${laneHeightDesktop}px}}`}</style>
+
+      {/* Mobile landscape hint (portrait + many participants) */}
+      {participants.length >= 8 && !landscapeHintDismissed && (
+        <div className="sm:hidden mb-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-clay-gold/30 rounded-xl border-2 border-clay-gold/50">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-clay-border shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="7" width="20" height="10" rx="2" />
+              <path d="M12 7v10" strokeDasharray="2 2" opacity="0.4" />
+            </svg>
+            <p className="font-body text-xs text-clay-text font-semibold flex-1">
+              참가자가 많아요! 가로 모드로 보면 더 잘 보여요
+            </p>
+            <button
+              type="button"
+              onClick={() => setLandscapeHintDismissed(true)}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full
+                         text-clay-muted hover:text-clay-text transition-colors cursor-pointer"
+              aria-label="가로 모드 안내 닫기"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="text-center mb-5">

@@ -39,22 +39,33 @@ export function createRaceEngine(config: RaceConfig) {
   const finishedSet = new Set<number>();
   let lastTimestamp = 0;
 
+  // 재사용 가능한 내부 상태 객체 (GC 부담 최소화)
+  const _state: RaceState = {
+    positions,
+    finished: false,
+    winnerId: predeterminedWinner,
+    finishOrder,
+    elapsedTime: 0,
+  };
+  const frameFinishers: { index: number; overshoot: number }[] = [];
+
   function dtScale(dt: number): number {
     return dt / REF_DT;
   }
 
+  /**
+   * 매 프레임 호출. 내부 배열을 직접 참조하는 객체를 반환합니다.
+   * React 상태에 넘길 때만 snapshot()을 사용하세요.
+   */
   function update(elapsed: number): RaceState {
     const dt = elapsed - lastTimestamp;
     lastTimestamp = elapsed;
 
+    _state.elapsedTime = elapsed;
+    _state.finished = false;
+
     if (dt <= 0 || elapsed <= 0) {
-      return {
-        positions: [...positions],
-        finished: false,
-        winnerId: predeterminedWinner,
-        finishOrder: [...finishOrder],
-        elapsedTime: elapsed,
-      };
+      return _state;
     }
 
     const progress = elapsed / totalDuration;
@@ -62,7 +73,7 @@ export function createRaceEngine(config: RaceConfig) {
     const winnerFinished = finishedSet.has(predeterminedWinner);
     const scale = dtScale(dt);
 
-    const frameFinishers: { index: number; overshoot: number }[] = [];
+    frameFinishers.length = 0;
 
     for (let i = 0; i < participantCount; i++) {
       if (finishedSet.has(i)) continue;
@@ -93,10 +104,8 @@ export function createRaceEngine(config: RaceConfig) {
         const deviation = positions[i] - expectedPos;
 
         if (deviation > 6) {
-          // 목표보다 너무 앞서감 → 점진적 감속 (하드캡 아님)
           movement *= Math.max(0.05, 1 - (deviation - 6) / 20);
         } else if (deviation < -8) {
-          // 목표보다 뒤처짐 → 살짝 가속
           movement *= 1.15 + Math.random() * 0.15;
         }
 
@@ -106,7 +115,7 @@ export function createRaceEngine(config: RaceConfig) {
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
-          const winTarget = 82 + finalProgress * 18; // 82→100
+          const winTarget = 82 + finalProgress * 18;
           const gap = winTarget - positions[i];
           if (gap > 0) {
             const convergence = 1 - Math.pow(1 - 0.12, scale);
@@ -120,7 +129,6 @@ export function createRaceEngine(config: RaceConfig) {
           if (positions[i] > winnerPos - 2) {
             const tooClose = positions[i] - (winnerPos - 2);
             const brake = Math.max(0.02, 1 - tooClose / 8);
-            // 감속 적용 (현재 프레임에서 이동한 만큼 보정)
             positions[i] -= movement * (1 - brake);
           }
         }
@@ -150,14 +158,19 @@ export function createRaceEngine(config: RaceConfig) {
       finishOrder.push(f.index);
     }
 
-    const allFinished = finishedSet.size === participantCount;
+    _state.finished = finishedSet.size === participantCount;
 
+    return _state;
+  }
+
+  /** React 상태용 불변 스냅샷 생성 */
+  function snapshot(): RaceState {
     return {
       positions: [...positions],
-      finished: allFinished,
+      finished: _state.finished,
       winnerId: predeterminedWinner,
       finishOrder: [...finishOrder],
-      elapsedTime: elapsed,
+      elapsedTime: _state.elapsedTime,
     };
   }
 
@@ -168,5 +181,5 @@ export function createRaceEngine(config: RaceConfig) {
     lastTimestamp = 0;
   }
 
-  return { update, reset };
+  return { update, snapshot, reset };
 }

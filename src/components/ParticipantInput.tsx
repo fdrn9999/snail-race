@@ -13,48 +13,47 @@ const SNAIL_TAG_COLORS = [
   "#E2F0CB", "#D4A5A5", "#9ED2C6", "#F3D1F4", "#FFE5B4",
 ];
 
-/** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 */
+/** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 (원본 유지) */
 function parseNames(text: string): {
   names: string[];
-  truncatedIndices: Set<number>;
+  tooLongIndices: Set<number>;
 } {
-  const truncatedIndices = new Set<number>();
-  const raw = text
+  const tooLongIndices = new Set<number>();
+  const names = text
     .split(/[\n,\t]+/)
     .map((n) => n.trim())
     .filter(Boolean);
 
-  const names = raw.map((n, i) => {
-    if (n.length > 8) {
-      truncatedIndices.add(i);
-      return n.slice(0, 8);
-    }
-    return n;
+  names.forEach((n, i) => {
+    if (n.length > 8) tooLongIndices.add(i);
   });
-  return { names, truncatedIndices };
+
+  return { names, tooLongIndices };
 }
 
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
   const [shaking, setShaking] = useState(false);
-  const prevTruncCount = useRef(0);
+  const prevTooLongCount = useRef(0);
 
-  const { names, truncatedIndices } = parseNames(text);
+  const { names, tooLongIndices } = parseNames(text);
   const validCount = Math.min(names.length, 15);
+  const hasTooLong = tooLongIndices.size > 0;
+  const canStart = validCount >= 2 && !hasTooLong;
 
-  // 잘린 이름이 새로 생기면 shake 트리거
+  // 초과 이름이 새로 생기면 shake 트리거
   useEffect(() => {
-    if (truncatedIndices.size > prevTruncCount.current) {
+    if (tooLongIndices.size > prevTooLongCount.current) {
       setShaking(true);
       const timer = setTimeout(() => setShaking(false), 400);
       return () => clearTimeout(timer);
     }
-    prevTruncCount.current = truncatedIndices.size;
-  }, [truncatedIndices.size]);
+    prevTooLongCount.current = tooLongIndices.size;
+  }, [tooLongIndices.size]);
 
   function handleStart() {
+    if (!canStart) return;
     const finalNames = names.slice(0, 15);
-    if (finalNames.length < 2) return;
     onStart(finalNames);
   }
 
@@ -65,7 +64,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
   function handleClear() {
     setText("");
-    prevTruncCount.current = 0;
+    prevTooLongCount.current = 0;
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -112,7 +111,7 @@ export default function ParticipantInput({ onStart }: Props) {
                        focus:outline-none focus:ring-4 focus:ring-clay-accent/30 focus:border-clay-accent
                        resize-none bg-clay-lilac/20 placeholder-clay-muted/70
                        clay-shadow-inset transition-colors duration-200
-                       ${shaking ? "border-clay-danger" : "border-clay-border"}`}
+                       ${shaking || hasTooLong ? "border-clay-danger" : "border-clay-border"}`}
             spellCheck={false}
             aria-label="참가자 이름을 줄바꿈, 쉼표, 탭으로 구분하여 입력"
           />
@@ -146,7 +145,7 @@ export default function ParticipantInput({ onStart }: Props) {
             className="mt-4 flex flex-wrap gap-2"
           >
             {names.slice(0, 15).map((name, i) => {
-              const isTruncated = truncatedIndices.has(i);
+              const isTooLong = tooLongIndices.has(i);
               return (
                 <motion.span
                   key={`${i}-${name}`}
@@ -156,7 +155,7 @@ export default function ParticipantInput({ onStart }: Props) {
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5
                              text-clay-text rounded-xl text-sm font-body font-semibold
                              border-2 clay-shadow
-                             ${isTruncated
+                             ${isTooLong
                                ? "border-clay-danger/60"
                                : "border-clay-border/30"
                              }`}
@@ -164,10 +163,10 @@ export default function ParticipantInput({ onStart }: Props) {
                 >
                   <span className="text-base" role="img" aria-label="달팽이">🐌</span>
                   <span className="max-w-[100px] truncate">{name}</span>
-                  {isTruncated && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-clay-danger shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="이름이 잘림">
-                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
+                  {isTooLong && (
+                    <span className="text-clay-danger text-[10px] font-bold shrink-0">
+                      {name.length}/8
+                    </span>
                   )}
                 </motion.span>
               );
@@ -204,7 +203,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
           <button
             onClick={handleStart}
-            disabled={validCount < 2}
+            disabled={!canStart}
             className="flex-[2] py-3 px-6 bg-clay-success text-white font-heading font-bold
                        rounded-2xl text-lg border-[3px] border-clay-border/20
                        clay-shadow cursor-pointer
@@ -223,9 +222,9 @@ export default function ParticipantInput({ onStart }: Props) {
 
         {/* Feedback messages */}
         <div className="mt-3 space-y-1 text-center">
-          {truncatedIndices.size > 0 && (
+          {hasTooLong && (
             <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
-              8자를 초과한 이름이 자동으로 잘렸습니다
+              8자를 초과한 이름이 있습니다 — 줄여주세요!
             </p>
           )}
           {validCount < 2 && (
