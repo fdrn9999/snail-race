@@ -386,7 +386,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex flex-col">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-3 h-dvh flex flex-col">
 
       {/* Mobile landscape hint */}
       {participants.length >= 8 && !landscapeHintDismissed && (
@@ -430,7 +430,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       />
 
       {/* ══════ Race Track ══════ */}
-      <div className="relative rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 relative rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden flex flex-col">
 
         {/* Top rail */}
         <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
@@ -451,7 +451,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         {/* Lanes */}
         <div
-          className="bg-[#4a8c3f] flex flex-col"
+          className="bg-[#4a8c3f] flex-1 min-h-0 flex flex-col"
           ref={trackRef}
         >
           {participants.map((name, index) => {
@@ -466,7 +466,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
             return (
               <div
                 key={index}
-                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 h-[52px]"
+                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0"
               >
                 <div className={`relative h-full ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}>
 
