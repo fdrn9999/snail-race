@@ -603,6 +603,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
             const is2nd = raceFinished && finishRank === 1;
             const is3rd = raceFinished && finishRank === 2;
             const isEven = index % 2 === 0;
+            // 결승선 근처(85%+)이거나 결승한 달팽이는 이름표를 왼쪽에 배치 (화면 잘림 방지)
+            const currentPos = raceState?.positions[index] ?? 0;
+            const nearFinish = currentPos >= 85 || finishRank >= 0;
 
             return (
               <div
@@ -758,8 +761,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
                                              : "bg-white/95 text-clay-text border-clay-border/30"
                                        }
                                        ${participants.length >= 11
-                                         ? "left-full top-1/2 -translate-y-1/2 ml-1 text-[8px] sm:text-[10px]"
-                                         : "-top-5 left-1/2 -translate-x-1/2 text-[10px] sm:text-[11px]"
+                                         ? nearFinish
+                                           ? "right-full top-1/2 -translate-y-1/2 mr-1 text-[8px] sm:text-[10px]"
+                                           : "left-full top-1/2 -translate-y-1/2 ml-1 text-[8px] sm:text-[10px]"
+                                         : nearFinish
+                                           ? "-top-5 right-0 text-[10px] sm:text-[11px]"
+                                           : "-top-5 left-1/2 -translate-x-1/2 text-[10px] sm:text-[11px]"
                                        }`}
                       >
                         {/* 2~3등 메달 표시 */}
