@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import confetti from "canvas-confetti";
+import Image from "next/image";
 import { createRaceEngine, type RaceState } from "@/lib/raceEngine";
 
 interface Props {
@@ -203,38 +204,60 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const handleSkip = useCallback(() => {
     if (!engineRef.current || !isRacing) return;
     cancelAnimationFrame(animFrameRef.current);
-    fadeOutBgm(500);
+    fadeOutBgm(400);
 
     const engine = engineRef.current;
     const state = engine.skipToEnd();
 
+    // 현재 위치에서 100%까지 0.4초간 빠르게 돌진하는 애니메이션
     const trackEl = trackRef.current;
-    if (trackEl) {
-      const trackWidth = trackEl.clientWidth;
+    if (!trackEl) return;
+
+    const tw = trackEl.clientWidth;
+    const startPositions = participants.map((_, i) => {
+      const el = snailRefs.current[i];
+      if (!el) return 0;
+      const match = el.style.transform.match(/translateX\(([\d.]+)px\)/);
+      return match ? parseFloat(match[1]) : 0;
+    });
+    const endPositions = participants.map((_, i) => (state.positions[i] / 100) * (tw - 60));
+
+    const skipStart = performance.now();
+    const SKIP_DURATION = 400;
+
+    const skipAnimate = (now: number) => {
+      const t = Math.min((now - skipStart) / SKIP_DURATION, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+
       for (let i = 0; i < participants.length; i++) {
         const el = snailRefs.current[i];
         if (el) {
-          const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
-          el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
-          // 등수 기반 고정 z-index (1등=200, 2등=199, ...)
+          const px = startPositions[i] + (endPositions[i] - startPositions[i]) * eased;
+          el.style.transform = `translateY(-50%) translateX(${px}px)`;
           const finishRank = state.finishOrder.indexOf(i);
           el.style.zIndex = `${200 - finishRank}`;
         }
       }
-    }
-    for (let i = 0; i < participants.length; i++) {
-      const slimeEl = slimeRefs.current[i];
-      if (slimeEl) slimeEl.style.display = "none";
-      const dustEl = dustRefs.current[i];
-      if (dustEl) dustEl.style.display = "none";
-      const sweatEl = sweatRefs.current[i];
-      if (sweatEl) sweatEl.style.display = "none";
-    }
 
-    setRaceState(engine.snapshot());
-    setIsRacing(false);
-    setTimeout(() => fireConfetti(), 300);
-  }, [isRacing, fireConfetti, fadeOutBgm, participants.length]);
+      if (t < 1) {
+        animFrameRef.current = requestAnimationFrame(skipAnimate);
+      } else {
+        // 애니메이션 완료
+        for (let i = 0; i < participants.length; i++) {
+          const slimeEl = slimeRefs.current[i];
+          if (slimeEl) slimeEl.style.display = "none";
+          const dustEl = dustRefs.current[i];
+          if (dustEl) dustEl.style.display = "none";
+          const sweatEl = sweatRefs.current[i];
+          if (sweatEl) sweatEl.style.display = "none";
+        }
+        setRaceState(engine.snapshot());
+        setIsRacing(false);
+        setTimeout(() => fireConfetti(), 200);
+      }
+    };
+    animFrameRef.current = requestAnimationFrame(skipAnimate);
+  }, [isRacing, fireConfetti, fadeOutBgm, participants]);
 
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
@@ -367,24 +390,23 @@ export default function RaceTrack({ participants, onReset }: Props) {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [isRacing, bgmMuted]);
 
-  const pendingReraceRef = useRef(false);
-
   const handleRerace = () => {
     cleanup();
+    // 달팽이 위치 초기화
+    const trackEl = trackRef.current;
+    if (trackEl) {
+      for (let i = 0; i < participants.length; i++) {
+        const el = snailRefs.current[i];
+        if (el) el.style.transform = "translateY(-50%) translateX(0px)";
+      }
+    }
     setRaceState(null);
     setIsRacing(false);
     setCountdown(null);
     setShowGo(false);
-    pendingReraceRef.current = true;
+    // 다음 마이크로태스크에서 즉시 시작 (React 배치 렌더 후)
+    queueMicrotask(() => startRace());
   };
-
-  // 상태 초기화 완료 후 새 레이스 시작 (80ms 매직넘버 제거)
-  useEffect(() => {
-    if (pendingReraceRef.current && raceState === null && !isRacing && countdown === null) {
-      pendingReraceRef.current = false;
-      startRace();
-    }
-  }, [raceState, isRacing, countdown, startRace]);
 
   const finishOrder = raceState?.finishOrder || [];
   const raceFinished = !!raceState?.finished;
@@ -438,9 +460,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* 풀 타이틀: 레이스 전/후에만 표시 */}
         {!isRacing && countdown === null && !raceFinished && (
           <div className="text-center mb-3 relative">
-            <h1 className="font-heading text-2xl sm:text-3xl font-bold text-clay-text tracking-tight">
-              달팽이 레이싱
-            </h1>
+            <div className="flex items-center justify-center gap-2">
+              <Image src="/logo.svg" alt="" width={36} height={36} className="drop-shadow-sm" aria-hidden="true" />
+              <h1 className="font-heading text-2xl sm:text-3xl font-bold text-clay-text tracking-tight">
+                달팽이 레이싱
+              </h1>
+            </div>
             <p className="font-body text-clay-muted text-sm mt-1">
               {participants.length}명 참가
             </p>
@@ -473,6 +498,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
           <div>
             {/* 한 줄 타이틀 */}
             <div className="flex items-center justify-center gap-2 mb-1.5">
+              <Image src="/logo.svg" alt="" width={22} height={22} className="drop-shadow-sm" aria-hidden="true" />
               <span className="font-heading text-sm sm:text-base font-bold text-clay-text">
                 달팽이 레이싱
               </span>

@@ -135,7 +135,8 @@ export function createRaceEngine(config: RaceConfig) {
           const winTarget = 76 + eased * 24;
           const gap = winTarget - positions[i];
           if (gap > 0) {
-            const convergence = 1 - Math.pow(1 - 0.05, scale);
+            // dt 기반 선형 보간 — FPS 무관 일관된 수렴
+            const convergence = Math.min(1, 0.003 * dt);
             positions[i] += gap * convergence;
           }
         }
@@ -151,7 +152,8 @@ export function createRaceEngine(config: RaceConfig) {
           const minPos = smoothProgress * 50;
           if (positions[i] < minPos) {
             const pullGap = minPos - positions[i];
-            const pull = 1 - Math.pow(1 - 0.04, scale);
+            // dt 기반 선형 보간 — FPS 무관 일관된 수렴
+            const pull = Math.min(1, 0.0024 * dt);
             positions[i] += pullGap * pull;
           }
         }
@@ -196,11 +198,12 @@ export function createRaceEngine(config: RaceConfig) {
       finishOrder.push(predeterminedWinner);
     }
 
-    // 나머지: 현재 위치 + 랜덤 가중치로 순서 결정
+    // 나머지: 현재 위치(가중치 85%) + 랜덤(15%)으로 순서 결정
+    // 초반 스킵 시에도 레이스 흐름과 일관된 결과를 보장
     const remaining: { index: number; score: number }[] = [];
     for (let i = 0; i < participantCount; i++) {
       if (!finishedSet.has(i)) {
-        remaining.push({ index: i, score: positions[i] + Math.random() * 15 });
+        remaining.push({ index: i, score: positions[i] * 0.85 + Math.random() * positions[i] * 0.15 + Math.random() * 3 });
       }
     }
     remaining.sort((a, b) => b.score - a.score);

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 interface Props {
   onStart: (names: string[]) => void;
@@ -99,11 +100,18 @@ export default function ParticipantInput({ onStart }: Props) {
       className="max-w-lg mx-auto pt-8 sm:pt-20"
     >
       <div className="bg-clay-card rounded-3xl p-6 sm:p-8 border-[3px] border-clay-border clay-shadow-lg">
-        {/* Title */}
+        {/* Title with Logo */}
         <div className="text-center mb-6">
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-clay-text tracking-tight">
-            달팽이 레이싱
-          </h1>
+          <div className="flex justify-center mb-2">
+            <Image
+              src="/logo.svg"
+              alt="SNAIL RACE 로고"
+              width={120}
+              height={120}
+              className="drop-shadow-md"
+              priority
+            />
+          </div>
           <p className="font-body text-clay-muted text-sm mt-2">
             참가자 이름을 입력하세요 (최대 15명, 8자 이내)
           </p>
@@ -179,7 +187,7 @@ export default function ParticipantInput({ onStart }: Props) {
                   style={{ backgroundColor: isTooLong ? "#FFEAEA" : SNAIL_TAG_COLORS[i] }}
                 >
                   <span className="text-base" role="img" aria-label="달팽이">{isTooLong ? "⚠️" : "🐌"}</span>
-                  <span className={`max-w-[100px] truncate ${isTooLong ? "line-through decoration-clay-danger/50" : ""}`}>{displayName}</span>
+                  <span className={`max-w-[120px] sm:max-w-[140px] truncate ${isTooLong ? "line-through decoration-clay-danger/50" : ""}`}>{displayName}</span>
                   {isTooLong && (
                     <span className="text-clay-danger text-[10px] font-bold shrink-0 bg-white/70 px-1 rounded">
                       {names[i].length}/8
