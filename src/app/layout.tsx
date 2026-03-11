@@ -13,6 +13,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7165994147929640"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className="min-h-screen bg-clay-bg">
         {/* Sky gradient background */}
         <div className="fixed inset-0 bg-gradient-to-b from-clay-sky-top via-clay-sky-bottom to-clay-bg -z-10" />
