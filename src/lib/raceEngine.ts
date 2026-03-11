@@ -21,17 +21,16 @@ export function createRaceEngine(config: RaceConfig) {
   const rbScale = config.rubberBandScale ?? 1.0;
   const finalPhaseStart = totalDuration - 2500;
 
-  // 뷰포트 기반 러버밴드 파라미터: 좁은 화면일수록 데드존 넓게, 보정 완만하게
-  const rbDeadzone = 4 + (1 - rbScale) * 4; // 4(데스크톱) ~ 8(모바일)
-  const rbDampRange = 30 + (1 - rbScale) * 15; // 30 ~ 45
+  // 뷰포트 기반 러버밴드 파라미터
+  const rbDeadzone = 4 + (1 - rbScale) * 4;
+  const rbDampRange = 30 + (1 - rbScale) * 15;
 
-  // ── 각 달팽이의 고유 특성 ──
   const snails = Array.from({ length: participantCount }, (_, i) => {
     const isWinner = i === predeterminedWinner;
     return {
       cruiseRate: isWinner
-        ? 0.93 + Math.random() * 0.03 // 0.93–0.96
-        : 0.88 + Math.random() * 0.07, // 0.88–0.95
+        ? 0.93 + Math.random() * 0.03
+        : 0.88 + Math.random() * 0.07,
       wave1: { freq: 0.3 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.04 },
       wave2: { freq: 0.7 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2, amp: 0.02 + Math.random() * 0.03 },
       wave3: { freq: 1.2 + Math.random() * 1.5, phase: Math.random() * Math.PI * 2, amp: 0.01 + Math.random() * 0.02 },
@@ -53,8 +52,25 @@ export function createRaceEngine(config: RaceConfig) {
   };
   const frameFinishers: { index: number; overshoot: number }[] = [];
 
-  /** 단일 시뮬레이션 틱 (내부용) */
-  function tick(dt: number, elapsed: number): void {
+  /**
+   * 매 프레임 호출.
+   * 탭 전환 시 시계 일시정지는 호출자(RaceTrack)에서 처리하므로,
+   * 엔진은 항상 작은 dt만 받는다고 가정합니다.
+   */
+  function update(elapsed: number): RaceState {
+    const rawDt = elapsed - lastTimestamp;
+    lastTimestamp = elapsed;
+
+    _state.elapsedTime = elapsed;
+    _state.finished = false;
+
+    // Safety cap for minor frame drops (대형 갭은 호출자에서 처리)
+    const dt = Math.min(rawDt, 50);
+
+    if (dt <= 0 || elapsed <= 0) {
+      return _state;
+    }
+
     smoothProgress = Math.min(smoothProgress + dt / totalDuration, 1);
     const timeSec = elapsed / 1000;
     const inFinalPhase = elapsed >= finalPhaseStart;
@@ -69,7 +85,6 @@ export function createRaceEngine(config: RaceConfig) {
       const snail = snails[i];
       const isWinner = i === predeterminedWinner;
 
-      // ── 사인파 조합: 부드러운 속도 변화 (±10% 이내) ──
       const w1 = Math.sin(timeSec * snail.wave1.freq + snail.wave1.phase) * snail.wave1.amp;
       const w2 = Math.sin(timeSec * snail.wave2.freq + snail.wave2.phase) * snail.wave2.amp;
       const w3 = Math.sin(timeSec * snail.wave3.freq + snail.wave3.phase) * snail.wave3.amp;
@@ -82,7 +97,6 @@ export function createRaceEngine(config: RaceConfig) {
       if (winnerFinished) {
         positions[i] += movement * 1.2;
       } else {
-        // ── 소프트 페이싱: smoothProgress 기반 러버밴드 ──
         const expectedPos = snail.cruiseRate * smoothProgress * 100;
         const deviation = positions[i] - expectedPos;
 
@@ -95,7 +109,6 @@ export function createRaceEngine(config: RaceConfig) {
 
         positions[i] += movement;
 
-        // ── 우승자 최종 구간 (마지막 2.5초) ──
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
@@ -108,7 +121,6 @@ export function createRaceEngine(config: RaceConfig) {
           }
         }
 
-        // ── 패배자: 우승자 추월 시 미세 감속 ──
         if (!isWinner && inFinalPhase) {
           const winnerPos = positions[predeterminedWinner];
           if (positions[i] > winnerPos + 0.5) {
@@ -116,7 +128,6 @@ export function createRaceEngine(config: RaceConfig) {
           }
         }
 
-        // ── 우승자 최소 보장: 부드러운 당김 ──
         if (isWinner) {
           const minPos = smoothProgress * 50;
           if (positions[i] < minPos) {
@@ -137,55 +148,55 @@ export function createRaceEngine(config: RaceConfig) {
       }
     }
 
+    // 동프레임 통과자 정렬 — 우승자 100% 보장
     if (frameFinishers.length > 1) {
-      frameFinishers.sort((a, b) => b.overshoot - a.overshoot);
+      frameFinishers.sort((a, b) => {
+        if (a.index === predeterminedWinner) return -1;
+        if (b.index === predeterminedWinner) return 1;
+        return b.overshoot - a.overshoot;
+      });
     }
     for (const f of frameFinishers) {
       finishOrder.push(f.index);
     }
 
     _state.finished = finishedSet.size === participantCount;
-  }
 
-  /**
-   * 매 프레임 호출. Catch-up 서브스테핑으로 탭 전환 시에도 동기화 유지.
-   * React 상태에 넘길 때만 snapshot()을 사용하세요.
-   */
-  function update(elapsed: number): RaceState {
-    const rawDt = elapsed - lastTimestamp;
-
-    _state.elapsedTime = elapsed;
-    _state.finished = false;
-
-    if (rawDt <= 0 || elapsed <= 0) {
-      lastTimestamp = elapsed;
-      return _state;
-    }
-
-    // ── Catch-up 서브스테핑 ──
-    // 탭 전환 등으로 rawDt가 클 때, 16.67ms 단위로 분할 실행
-    // 최대 500ms(~30틱)까지 시뮬레이션하여 메인 스레드 프리즈 방지
-    const MAX_CATCHUP_MS = 500;
-    const simulateMs = Math.min(rawDt, MAX_CATCHUP_MS);
-    const steps = Math.max(1, Math.round(simulateMs / REF_DT));
-    const stepDt = simulateMs / steps; // ≈ 16.67ms
-
-    // 500ms 초과분은 smoothProgress만 빠르게 전진 (러버밴드가 자연스럽게 따라잡음)
-    if (rawDt > MAX_CATCHUP_MS) {
-      smoothProgress = Math.min(smoothProgress + (rawDt - MAX_CATCHUP_MS) / totalDuration, 1);
-    }
-
-    const baseElapsed = elapsed - simulateMs;
-    for (let s = 0; s < steps; s++) {
-      tick(stepDt, baseElapsed + stepDt * (s + 1));
-      if (_state.finished) break;
-    }
-
-    lastTimestamp = elapsed;
     return _state;
   }
 
-  /** React 상태용 불변 스냅샷 생성 */
+  /**
+   * O(n) 즉시 완료 — 스킵 버튼용.
+   * while 루프 대신 한 번에 최종 결과를 생성합니다.
+   */
+  function skipToEnd(): RaceState {
+    // 우승자 우선 통과
+    if (!finishedSet.has(predeterminedWinner)) {
+      positions[predeterminedWinner] = 100;
+      finishedSet.add(predeterminedWinner);
+      finishOrder.push(predeterminedWinner);
+    }
+
+    // 나머지: 현재 위치 + 랜덤 가중치로 순서 결정
+    const remaining: { index: number; score: number }[] = [];
+    for (let i = 0; i < participantCount; i++) {
+      if (!finishedSet.has(i)) {
+        remaining.push({ index: i, score: positions[i] + Math.random() * 15 });
+      }
+    }
+    remaining.sort((a, b) => b.score - a.score);
+
+    for (const r of remaining) {
+      positions[r.index] = 100;
+      finishedSet.add(r.index);
+      finishOrder.push(r.index);
+    }
+
+    _state.finished = true;
+    _state.elapsedTime = totalDuration;
+    return _state;
+  }
+
   function snapshot(): RaceState {
     return {
       positions: [...positions],
@@ -204,5 +215,5 @@ export function createRaceEngine(config: RaceConfig) {
     smoothProgress = 0;
   }
 
-  return { update, snapshot, reset };
+  return { update, snapshot, reset, skipToEnd };
 }

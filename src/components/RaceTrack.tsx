@@ -131,14 +131,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     cancelAnimationFrame(animFrameRef.current);
 
     const engine = engineRef.current;
-    let t = lastTimestamp.current;
-    let state = engine.update(t);
-    let failsafe = 0;
-    while (!state.finished && failsafe < 2000) {
-      t += 16.67;
-      state = engine.update(t);
-      failsafe++;
-    }
+    const state = engine.skipToEnd();
 
     const trackEl = trackRef.current;
     if (trackEl) {
@@ -148,7 +141,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
         if (el) {
           const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
           el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
-          el.style.zIndex = `${20 + Math.round(state.positions[i])}`;
+          // 등수 기반 고정 z-index (1등=200, 2등=199, ...)
+          const finishRank = state.finishOrder.indexOf(i);
+          el.style.zIndex = `${200 - finishRank}`;
         }
       }
     }
@@ -204,7 +199,18 @@ export default function RaceTrack({ participants, onReset }: Props) {
         startTimeRef.current = performance.now();
 
         const animate = (timestamp: number) => {
-          const elapsed = timestamp - startTimeRef.current;
+          let elapsed = timestamp - startTimeRef.current;
+
+          // ── 탭 전환 감지: 200ms 이상 갭 → 레이스 시계 일시정지 ──
+          // 엔진에 큰 dt를 보내지 않아 급발진/순간이동 방지
+          if (lastTimestamp.current > 0) {
+            const gap = elapsed - lastTimestamp.current;
+            if (gap > 200) {
+              startTimeRef.current += (gap - 16.67);
+              elapsed = lastTimestamp.current + 16.67;
+            }
+          }
+
           lastTimestamp.current = elapsed;
           const state = engine.update(elapsed);
 
@@ -216,7 +222,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
               if (el) {
                 const pxPos = (state.positions[i] / 100) * (tw - 60);
                 el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
-                el.style.zIndex = `${20 + Math.round(state.positions[i])}`;
+                // 결승 통과: 등수 기반 고정 z-index / 레이스 중: 위치 기반
+                const finishRank = state.finishOrder.indexOf(i);
+                el.style.zIndex = finishRank >= 0
+                  ? `${200 - finishRank}`
+                  : `${20 + Math.round(state.positions[i])}`;
               }
             }
           }
@@ -225,7 +235,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
           frameCountRef.current++;
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
-          if (finishChanged || frameCountRef.current % 3 === 0 || state.finished) {
+          if (finishChanged || frameCountRef.current % 12 === 0 || state.finished) {
             prevFinishCountRef.current = state.finishOrder.length;
             setRaceState(engine.snapshot());
           }
@@ -358,7 +368,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                         <motion.span
                           key={`rank-${participantIdx}`}
                           layout
-                          transition={{ type: "spring", stiffness: 300, damping: 28, mass: 0.8 }}
+                          transition={{ type: "spring", stiffness: 200, damping: 35, mass: 1 }}
                           className={`inline-flex items-center gap-0.5 shrink-0
                             ${isTop3
                               ? `px-1.5 sm:px-2 py-0.5 rounded-lg border
@@ -546,16 +556,24 @@ export default function RaceTrack({ participants, onReset }: Props) {
                           size={snailSize}
                         />
                       </div>
-                      <div className={`absolute -top-5 left-1/2 -translate-x-1/2
-                                       px-2 py-0.5 rounded-lg whitespace-nowrap
-                                       font-heading font-bold text-[10px] sm:text-[11px]
+                      <div className={`absolute whitespace-nowrap
+                                       px-2 py-0.5 rounded-lg
+                                       font-heading font-bold
                                        border-[2px] border-clay-border/30 shadow-sm
                                        ${isWinner
                                          ? "bg-clay-gold text-clay-border"
                                          : "bg-white/95 text-clay-text"
+                                       }
+                                       ${participants.length >= 11
+                                         ? "left-full top-1/2 -translate-y-1/2 ml-1 text-[8px] sm:text-[10px]"
+                                         : "-top-5 left-1/2 -translate-x-1/2 text-[10px] sm:text-[11px]"
                                        }`}
                       >
-                        <span className="max-w-[72px] sm:max-w-[96px] truncate inline-block text-[9px] sm:text-[11px]">
+                        <span className={`truncate inline-block
+                          ${participants.length >= 11
+                            ? "max-w-[48px] sm:max-w-[72px] text-[7px] sm:text-[9px]"
+                            : "max-w-[72px] sm:max-w-[96px] text-[9px] sm:text-[11px]"
+                          }`}>
                           {name}
                         </span>
                       </div>
