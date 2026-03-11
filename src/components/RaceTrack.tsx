@@ -593,10 +593,14 @@ export default function RaceTrack({ participants, onReset }: Props) {
                           size={snailSize}
                         />
                       </div>
+                      {/* Name tag — right side (default) */}
                       <div className={`absolute whitespace-nowrap
                                        px-2 py-0.5 rounded-lg
                                        font-heading font-bold
                                        border-[2px] shadow-sm
+                                       left-full top-1/2 -translate-y-1/2 ml-1
+                                       transition-opacity duration-300
+                                       ${nearFinish ? "opacity-0 pointer-events-none" : "opacity-100"}
                                        ${isWinner
                                          ? "bg-clay-gold text-clay-border border-clay-gold/60"
                                          : is2nd
@@ -606,20 +610,47 @@ export default function RaceTrack({ participants, onReset }: Props) {
                                              : "bg-white/95 text-clay-text border-clay-border/30"
                                        }
                                        ${participants.length >= 11
-                                         ? nearFinish
-                                           ? "right-full top-1/2 -translate-y-1/2 mr-1 text-[8px] sm:text-[10px]"
-                                           : "left-full top-1/2 -translate-y-1/2 ml-1 text-[8px] sm:text-[10px]"
-                                         : nearFinish
-                                           ? "-top-5 right-0 text-[10px] sm:text-[11px]"
-                                           : "-top-5 left-1/2 -translate-x-1/2 text-[10px] sm:text-[11px]"
+                                         ? "text-[8px] sm:text-[10px]"
+                                         : "text-[10px] sm:text-[11px]"
                                        }`}
                       >
                         {is2nd && <span className="mr-0.5 text-[9px]">🥈</span>}
                         {is3rd && <span className="mr-0.5 text-[9px]">🥉</span>}
                         <span className={`truncate inline-block
                           ${participants.length >= 11
-                            ? "max-w-[72px] sm:max-w-[100px] text-[8px] sm:text-[10px]"
-                            : "max-w-[88px] sm:max-w-[120px] text-[9px] sm:text-[11px]"
+                            ? "max-w-[72px] sm:max-w-[100px]"
+                            : "max-w-[88px] sm:max-w-[120px]"
+                          }`}>
+                          {name}
+                        </span>
+                      </div>
+                      {/* Name tag — left side (near finish) */}
+                      <div className={`absolute whitespace-nowrap
+                                       px-2 py-0.5 rounded-lg
+                                       font-heading font-bold
+                                       border-[2px] shadow-sm
+                                       right-full top-1/2 -translate-y-1/2 mr-1
+                                       transition-opacity duration-300
+                                       ${nearFinish ? "opacity-100" : "opacity-0 pointer-events-none"}
+                                       ${isWinner
+                                         ? "bg-clay-gold text-clay-border border-clay-gold/60"
+                                         : is2nd
+                                           ? "bg-gray-200 text-clay-border border-gray-300/60"
+                                           : is3rd
+                                             ? "bg-orange-200 text-clay-border border-orange-300/60"
+                                             : "bg-white/95 text-clay-text border-clay-border/30"
+                                       }
+                                       ${participants.length >= 11
+                                         ? "text-[8px] sm:text-[10px]"
+                                         : "text-[10px] sm:text-[11px]"
+                                       }`}
+                      >
+                        {is2nd && <span className="mr-0.5 text-[9px]">🥈</span>}
+                        {is3rd && <span className="mr-0.5 text-[9px]">🥉</span>}
+                        <span className={`truncate inline-block
+                          ${participants.length >= 11
+                            ? "max-w-[72px] sm:max-w-[100px]"
+                            : "max-w-[88px] sm:max-w-[120px]"
                           }`}>
                           {name}
                         </span>
