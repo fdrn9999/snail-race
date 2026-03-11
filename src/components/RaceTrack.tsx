@@ -245,8 +245,20 @@ export default function RaceTrack({ participants, onReset }: Props) {
     setTimeout(() => startRace(), 80);
   };
 
-  const rankings = raceState?.finishOrder || [];
+  const finishOrder = raceState?.finishOrder || [];
   const raceFinished = !!raceState?.finished;
+
+  // 실시간 순위: 확정된 finisher 먼저, 나머지는 현재 위치(높은 순)로 정렬
+  const liveRankings: number[] = [];
+  if (raceState) {
+    const finishedSet = new Set(finishOrder);
+    liveRankings.push(...finishOrder);
+    const remaining = participants
+      .map((_, i) => i)
+      .filter((i) => !finishedSet.has(i))
+      .sort((a, b) => raceState.positions[b] - raceState.positions[a]);
+    liveRankings.push(...remaining);
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
@@ -455,9 +467,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Bottom rail */}
         <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
 
-        {/* ═══ Ranking Panel (center overlay) ═══ */}
+        {/* ═══ Ranking Panel (center overlay, always visible during race) ═══ */}
         <AnimatePresence>
-          {raceState && rankings.length > 0 && (
+          {(isRacing || raceFinished) && raceState && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -479,35 +491,44 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
                 {/* ── Top 3 — prominent ── */}
                 <div className="space-y-1.5">
-                  {rankings.slice(0, 3).map((participantIdx, rank) => {
-                    const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉";
+                  {liveRankings.slice(0, 3).map((participantIdx, rank) => {
+                    const isConfirmed = rank < finishOrder.length;
+                    const medal = isConfirmed
+                      ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
+                      : null;
                     const isFirst = rank === 0;
 
                     return (
                       <motion.div
-                        key={participantIdx}
+                        key={`top-${participantIdx}`}
                         initial={{ opacity: 0, x: -16 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.25, delay: rank * 0.06 }}
+                        transition={{ duration: 0.25 }}
                         className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border-2
-                          ${isFirst
-                            ? "bg-clay-gold/35 border-clay-gold"
-                            : rank === 1
-                              ? "bg-clay-lilac/25 border-clay-lilac/60"
-                              : "bg-clay-peach/20 border-clay-peach/50"
+                          ${isConfirmed
+                            ? isFirst
+                              ? "bg-clay-gold/35 border-clay-gold"
+                              : rank === 1
+                                ? "bg-clay-lilac/25 border-clay-lilac/60"
+                                : "bg-clay-peach/20 border-clay-peach/50"
+                            : "bg-white/20 border-clay-border/10"
                           }`}
                       >
-                        <span className={`shrink-0 ${isFirst ? "text-base sm:text-lg" : "text-sm sm:text-base"}`}>
-                          {medal}
+                        <span className={`shrink-0 font-heading font-bold
+                          ${isFirst ? "text-base sm:text-lg" : "text-sm sm:text-base"}
+                          ${isConfirmed ? "" : "text-clay-muted/60"}`}>
+                          {medal || `${rank + 1}`}
                         </span>
                         <SnailSvg
                           shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
                           size={isFirst ? 28 : 22}
                         />
                         <span className={`font-heading font-bold truncate
-                          ${isFirst
-                            ? "text-sm sm:text-base text-clay-text"
-                            : "text-xs sm:text-sm text-clay-text/85"
+                          ${isConfirmed
+                            ? isFirst
+                              ? "text-sm sm:text-base text-clay-text"
+                              : "text-xs sm:text-sm text-clay-text/85"
+                            : "text-xs sm:text-sm text-clay-muted/60"
                           }`}>
                           {participants[participantIdx]}
                         </span>
@@ -517,22 +538,24 @@ export default function RaceTrack({ participants, onReset }: Props) {
                 </div>
 
                 {/* ── 4th+ — compact, muted ── */}
-                {rankings.length > 3 && (
+                {liveRankings.length > 3 && (
                   <div className="mt-2 pt-2 border-t-2 border-clay-border/8">
                     <div className="flex flex-wrap gap-x-1 gap-y-px">
-                      {rankings.slice(3).map((participantIdx, i) => (
-                        <motion.span
-                          key={participantIdx}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.15 }}
-                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5
-                                     text-[9px] sm:text-[10px] text-clay-muted/70 font-body font-semibold"
-                        >
-                          <span className="text-clay-muted/50">{i + 4}</span>
-                          <span className="truncate max-w-[52px] sm:max-w-[64px]">{participants[participantIdx]}</span>
-                        </motion.span>
-                      ))}
+                      {liveRankings.slice(3).map((participantIdx, i) => {
+                        const rank = i + 3;
+                        const isConfirmed = rank < finishOrder.length;
+                        return (
+                          <span
+                            key={`rest-${participantIdx}`}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5
+                                       text-[9px] sm:text-[10px] font-body font-semibold
+                                       ${isConfirmed ? "text-clay-muted/70" : "text-clay-muted/40"}`}
+                          >
+                            <span className={isConfirmed ? "text-clay-muted/50" : "text-clay-muted/30"}>{i + 4}</span>
+                            <span className="truncate max-w-[52px] sm:max-w-[64px]">{participants[participantIdx]}</span>
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
