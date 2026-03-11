@@ -20,13 +20,19 @@ const SNAIL_TAG_COLORS = [
   "bg-clay-lilac",
 ];
 
+/** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 */
+function parseNames(text: string): string[] {
+  return text
+    .split(/[\n,\t]+/)
+    .map((n) => n.trim())
+    .filter(Boolean)
+    .map((n) => (n.length > 8 ? n.slice(0, 8) : n));
+}
+
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
 
-  const names = text
-    .split("\n")
-    .map((n) => n.trim())
-    .filter(Boolean);
+  const names = parseNames(text);
   const validCount = Math.min(names.length, 10);
 
   function handleStart() {
@@ -45,7 +51,7 @@ export default function ParticipantInput({ onStart }: Props) {
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="max-w-lg mx-auto pt-12 sm:pt-20"
+      className="max-w-lg mx-auto pt-8 sm:pt-20"
     >
       <div className="bg-clay-card rounded-3xl p-6 sm:p-8 border-[3px] border-clay-border clay-shadow-lg">
         {/* Title */}
@@ -54,24 +60,32 @@ export default function ParticipantInput({ onStart }: Props) {
             달팽이 레이싱
           </h1>
           <p className="font-body text-clay-muted text-sm mt-2">
-            참가자 이름을 입력하세요 (한 줄에 한 명, 최대 10명)
+            참가자 이름을 입력하세요 (최대 10명, 8자 이내)
+          </p>
+          <p className="font-body text-clay-muted/60 text-xs mt-1">
+            줄바꿈 / 쉼표 / 탭으로 구분 가능
           </p>
         </div>
 
         {/* Textarea */}
         <div className="relative">
+          <label htmlFor="participant-input" className="sr-only">
+            참가자 이름 입력
+          </label>
           <textarea
+            id="participant-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={"참가자1\n참가자2\n참가자3\n..."}
-            className="w-full h-48 p-4 border-[3px] border-clay-border rounded-2xl text-base
+            placeholder={"철수, 영희, 민수\n또는 한 줄에 한 명씩..."}
+            className="w-full h-32 sm:h-48 p-4 border-[3px] border-clay-border rounded-2xl text-base
                        font-body font-medium text-clay-text
                        focus:outline-none focus:ring-4 focus:ring-clay-accent/30 focus:border-clay-accent
                        resize-none bg-clay-lilac/20 placeholder-clay-muted/40
                        clay-shadow-inset transition-colors duration-200"
             spellCheck={false}
+            aria-label="참가자 이름을 줄바꿈, 쉼표, 탭으로 구분하여 입력"
           />
-          {/* Character count indicator */}
+          {/* Count indicator */}
           <span className="absolute bottom-3 right-3 text-xs font-body text-clay-muted/60">
             {validCount}/10명
           </span>

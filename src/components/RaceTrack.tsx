@@ -10,7 +10,6 @@ interface Props {
   onReset: () => void;
 }
 
-/* ── vivid snail shell colors ── */
 const SHELL_COLORS = [
   "#FF6B6B", "#4ECDC4", "#45B7D1", "#FDCB6E", "#A29BFE",
   "#FF9ECD", "#6C5CE7", "#E17055", "#00B894", "#74B9FF",
@@ -21,37 +20,34 @@ const RACE_DURATION = 10000;
 /* ── SVG Snail (cartoon) ── */
 function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* body */}
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <ellipse cx="32" cy="46" rx="28" ry="10" fill="#FFD993" stroke="#C68B3E" strokeWidth="2" />
-      {/* body highlight */}
       <ellipse cx="28" cy="44" rx="18" ry="5" fill="#FFE8B8" opacity="0.6" />
-      {/* shell */}
       <circle cx="36" cy="30" r="18" fill={shellColor} stroke="#2D3436" strokeWidth="2.5" />
-      {/* shell spiral */}
       <path d="M36 16 C42 20, 46 26, 44 32 C42 38, 36 40, 32 36 C28 32, 30 26, 36 24 C40 22, 42 28, 38 30"
             stroke="#2D3436" strokeWidth="1.8" fill="none" strokeLinecap="round" opacity="0.5" />
-      {/* shell highlight */}
       <circle cx="30" cy="24" r="4" fill="white" opacity="0.35" />
-      {/* head */}
       <ellipse cx="14" cy="40" rx="10" ry="8" fill="#FFD993" stroke="#C68B3E" strokeWidth="1.5" />
-      {/* eye stalks */}
       <line x1="10" y1="36" x2="6" y2="26" stroke="#C68B3E" strokeWidth="2" strokeLinecap="round" />
       <line x1="16" y1="35" x2="14" y2="25" stroke="#C68B3E" strokeWidth="2" strokeLinecap="round" />
-      {/* eyes */}
       <circle cx="6" cy="24" r="3.5" fill="white" stroke="#2D3436" strokeWidth="1.5" />
       <circle cx="14" cy="23" r="3.5" fill="white" stroke="#2D3436" strokeWidth="1.5" />
       <circle cx="7" cy="23.5" r="1.8" fill="#2D3436" />
       <circle cx="15" cy="22.5" r="1.8" fill="#2D3436" />
-      {/* eye shine */}
       <circle cx="6" cy="22" r="0.8" fill="white" />
       <circle cx="14" cy="21" r="0.8" fill="white" />
-      {/* smile */}
       <path d="M10 43 Q14 46 18 43" stroke="#C68B3E" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      {/* cheek blush */}
       <ellipse cx="8" cy="42" rx="2.5" ry="1.5" fill="#FFB5B5" opacity="0.5" />
     </svg>
   );
+}
+
+/** 참가자 수에 따라 레인 높이 계산 (px) */
+function getLaneHeight(count: number, isDesktop: boolean): number {
+  if (count <= 4) return isDesktop ? 80 : 68;
+  if (count <= 6) return isDesktop ? 72 : 62;
+  if (count <= 8) return isDesktop ? 64 : 54;
+  return isDesktop ? 56 : 48; // 9-10명
 }
 
 export default function RaceTrack({ participants, onReset }: Props) {
@@ -63,6 +59,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  /** 각 달팽이의 DOM 요소에 직접 transform 적용 (성능 최적화) */
+  const snailRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const cleanup = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
@@ -91,6 +91,29 @@ export default function RaceTrack({ participants, onReset }: Props) {
     frame();
   }, []);
 
+  /** 우승자 발표 시 자동 스크롤 */
+  const scrollToResult = useCallback(() => {
+    setTimeout(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
+  }, []);
+
+  /** 레이스를 즉시 종료 (스킵) */
+  const handleSkip = useCallback(() => {
+    if (!engineRef.current || !isRacing) return;
+    cancelAnimationFrame(animFrameRef.current);
+
+    // 엔진을 끝까지 돌려서 최종 상태 확보
+    const finalState = engineRef.current.update(RACE_DURATION + 100);
+    setRaceState(finalState);
+    setIsRacing(false);
+    setTimeout(() => {
+      setShowResult(true);
+      fireConfetti();
+      scrollToResult();
+    }, 300);
+  }, [isRacing, fireConfetti, scrollToResult]);
+
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
 
@@ -101,6 +124,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     });
 
     engineRef.current = engine;
+    snailRefs.current = new Array(participants.length).fill(null);
     setRaceState(null);
     setShowResult(false);
 
@@ -120,6 +144,20 @@ export default function RaceTrack({ participants, onReset }: Props) {
         const animate = (timestamp: number) => {
           const elapsed = timestamp - startTimeRef.current;
           const state = engine.update(elapsed);
+
+          // GPU 가속: DOM 직접 조작으로 translateX 적용
+          const trackEl = trackRef.current;
+          if (trackEl) {
+            const trackWidth = trackEl.clientWidth;
+            for (let i = 0; i < participants.length; i++) {
+              const el = snailRefs.current[i];
+              if (el) {
+                const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
+                el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
+              }
+            }
+          }
+
           setRaceState(state);
 
           if (!state.finished) {
@@ -129,13 +167,14 @@ export default function RaceTrack({ participants, onReset }: Props) {
             setTimeout(() => {
               setShowResult(true);
               fireConfetti();
+              scrollToResult();
             }, 400);
           }
         };
         animFrameRef.current = requestAnimationFrame(animate);
       }
     }, 1000);
-  }, [participants, fireConfetti]);
+  }, [participants, fireConfetti, scrollToResult]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -150,6 +189,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
   const winnerName =
     raceState && showResult ? participants[raceState.winnerId] : null;
+
+  // 레인 높이 (참가자 수에 따라 유동)
+  const laneHeightMobile = getLaneHeight(participants.length, false);
+  const laneHeightDesktop = getLaneHeight(participants.length, true);
+  const snailSize = participants.length >= 9 ? 32 : 38;
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
@@ -169,8 +213,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Top rail — dark wood fence */}
         <div className="h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
                         border-b-[3px] border-[#3E2723]">
-          {/* Fence posts */}
-          <div className="flex gap-6 sm:gap-10 absolute inset-x-0 top-0 h-full items-end px-2 pointer-events-none">
+          <div className="flex gap-6 sm:gap-10 absolute inset-x-0 top-0 h-full items-end px-2 pointer-events-none" aria-hidden="true">
             {Array.from({ length: 14 }).map((_, i) => (
               <div key={i} className="w-[6px] h-full bg-[#4E342E] rounded-t-sm shrink-0 opacity-40" />
             ))}
@@ -182,7 +225,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
           <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest z-10
                            bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15 flex items-center gap-1.5">
             Finish
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
               <line x1="4" y1="22" x2="4" y2="15" />
             </svg>
@@ -190,9 +233,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </div>
 
         {/* Lanes area */}
-        <div className="bg-[#4a8c3f]">
+        <div className="bg-[#4a8c3f]" ref={trackRef}>
           {participants.map((name, index) => {
-            const position = raceState?.positions[index] || 0;
             const isWinner = showResult && raceState?.winnerId === index;
             const isEven = index % 2 === 0;
 
@@ -201,42 +243,39 @@ export default function RaceTrack({ participants, onReset }: Props) {
                 key={index}
                 className="relative border-b-[2px] border-[#3d7233] last:border-b-0"
               >
-                {/* Lane background — alternating grass shades */}
-                <div className={`h-[62px] sm:h-[72px] relative ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}>
+                <div
+                  className={`relative ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}
+                  style={{
+                    height: `${laneHeightMobile}px`,
+                  }}
+                >
+                  {/* Desktop height override via media query inline workaround */}
+                  <style>{`@media(min-width:640px){[data-lane="${index}"]{height:${laneHeightDesktop}px!important}}`}</style>
+                  <div data-lane={index} className="absolute inset-0" />
 
                   {/* Grass mow stripes */}
                   <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
                     <div
                       className="w-full h-full opacity-[0.08]"
                       style={{
-                        backgroundImage: `repeating-linear-gradient(
-                          90deg,
-                          transparent 0px,
-                          transparent 30px,
-                          rgba(255,255,255,0.6) 30px,
-                          rgba(255,255,255,0.6) 60px
-                        )`,
+                        backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 30px, rgba(255,255,255,0.6) 30px, rgba(255,255,255,0.6) 60px)`,
                       }}
                     />
                   </div>
 
-                  {/* Grass tufts (decorative) */}
+                  {/* Grass tufts */}
                   <div className="absolute bottom-0 inset-x-0 pointer-events-none" aria-hidden="true">
                     {[8, 22, 38, 55, 68, 82, 93].map((leftPct, j) => (
-                      <span
-                        key={j}
-                        className="absolute bottom-0 text-[#3d7a28] text-[10px] sm:text-xs select-none"
-                        style={{ left: `${leftPct}%` }}
-                      >
-                        �
-                      </span>
+                      <svg key={j} className="absolute bottom-0 w-3 h-3 text-[#3d7a28] opacity-50"
+                           style={{ left: `${leftPct}%` }} viewBox="0 0 12 12" fill="currentColor">
+                        <path d="M2 12 L4 5 L6 12 M5 12 L7 3 L9 12 M8 12 L10 6 L12 12" stroke="currentColor" strokeWidth="1" fill="none" />
+                      </svg>
                     ))}
                   </div>
 
                   {/* Dirt track lane (center strip) */}
-                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[34px] sm:h-[40px] mx-1
+                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[60%] mx-1
                                   bg-[#C9A96E] rounded-lg border border-[#a88c4a]/50 overflow-hidden">
-                    {/* Dirt texture */}
                     <div
                       className="absolute inset-0 opacity-30 pointer-events-none"
                       style={{
@@ -248,9 +287,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                         backgroundSize: "40px 20px",
                       }}
                     />
-                    {/* Top edge highlight */}
                     <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-b from-white/15 to-transparent" />
-                    {/* Bottom edge shadow */}
                     <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-t from-black/10 to-transparent" />
                   </div>
 
@@ -269,36 +306,34 @@ export default function RaceTrack({ participants, onReset }: Props) {
                     <div
                       className="w-full h-full"
                       style={{
-                        backgroundImage:
-                          "repeating-conic-gradient(#1a1a1a 0% 25%, #ffffff 0% 50%)",
+                        backgroundImage: "repeating-conic-gradient(#1a1a1a 0% 25%, #ffffff 0% 50%)",
                         backgroundSize: "8px 8px",
                       }}
                     />
-                    {/* Finish line left border */}
                     <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#E74C3C]" />
                   </div>
 
-                  {/* ── SNAIL ── */}
+                  {/* ── SNAIL ── GPU accelerated with transform: translateX */}
                   <div
-                    className="absolute top-1/2 z-20 will-change-transform"
+                    ref={(el) => { snailRefs.current[index] = el; }}
+                    className="absolute top-1/2 left-[10px] z-20 will-change-transform"
                     style={{
-                      left: `calc(${3 + position * 0.82}%)`,
-                      transform: "translateY(-50%)",
+                      transform: "translateY(-50%) translateX(0px)",
                     }}
                   >
                     {/* Slime trail */}
-                    {isRacing && position > 2 && (
+                    {isRacing && (raceState?.positions[index] || 0) > 2 && (
                       <div
                         className="absolute right-full top-1/2 -translate-y-1/2 h-[6px] rounded-full pointer-events-none opacity-40"
                         style={{
-                          width: `${Math.min(position * 0.6, 40)}px`,
+                          width: `${Math.min((raceState?.positions[index] || 0) * 0.6, 40)}px`,
                           background: "linear-gradient(90deg, transparent, #a8d97f)",
                         }}
                       />
                     )}
 
                     {/* Dust cloud particles */}
-                    {isRacing && position > 3 && (
+                    {isRacing && (raceState?.positions[index] || 0) > 3 && (
                       <div className="absolute -left-1 top-1/2 -translate-y-1/2 pointer-events-none">
                         {[0, 1, 2, 3].map((d) => (
                           <span
@@ -319,11 +354,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
                     {/* Snail container */}
                     <div className={`relative flex items-center ${isWinner ? "animate-winner-bounce" : ""}`}>
-                      {/* Snail SVG */}
                       <div className={`relative ${isWinner ? "animate-winner-glow rounded-2xl" : ""}`}>
                         <SnailSvg
                           shellColor={SHELL_COLORS[index % SHELL_COLORS.length]}
-                          size={38}
+                          size={snailSize}
                         />
                       </div>
                       {/* Name tag */}
@@ -348,7 +382,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
           })}
         </div>
 
-        {/* Bottom rail — dark wood fence */}
+        {/* Bottom rail */}
         <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
 
         {/* Countdown overlay */}
@@ -394,10 +428,33 @@ export default function RaceTrack({ participants, onReset }: Props) {
                        hover:brightness-95 transition-all duration-200"
           >
             <span className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               레이스 시작!
+            </span>
+          </motion.button>
+        )}
+
+        {/* Skip button during race */}
+        {isRacing && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 3, duration: 0.3 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSkip}
+            className="py-2.5 px-5 bg-clay-card text-clay-muted font-heading font-bold
+                       rounded-2xl text-sm border-[3px] border-clay-border/15
+                       clay-shadow cursor-pointer
+                       hover:text-clay-text hover:brightness-95 transition-all duration-200"
+          >
+            <span className="flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="5 4 15 12 5 20 5 4" />
+                <line x1="19" y1="5" x2="19" y2="19" />
+              </svg>
+              결과 바로보기
             </span>
           </motion.button>
         )}
@@ -416,7 +473,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                          hover:brightness-95 transition-all duration-200"
             >
               <span className="flex items-center gap-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                 </svg>
                 다시 레이스
@@ -434,7 +491,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                          hover:brightness-95 transition-all duration-200"
             >
               <span className="flex items-center gap-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                   <path d="m15 5 4 4" />
                 </svg>
@@ -449,6 +506,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       <AnimatePresence>
         {showResult && winnerName && (
           <motion.div
+            ref={resultRef}
             initial={{ opacity: 0, y: 32, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16 }}
@@ -457,7 +515,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
           >
             <div className="inline-block bg-clay-card rounded-3xl p-6 sm:p-8 border-[3px] border-clay-border clay-shadow-lg">
               <div className="animate-trophy-pulse">
-                {/* Winner snail large */}
                 <div className="mx-auto mb-3">
                   <SnailSvg
                     shellColor={SHELL_COLORS[raceState!.winnerId % SHELL_COLORS.length]}
@@ -465,10 +522,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
                   />
                 </div>
 
-                {/* Trophy badge */}
                 <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-clay-gold rounded-2xl border-[3px] border-clay-border/20
                                 flex items-center justify-center clay-shadow mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 sm:w-8 sm:h-8 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 sm:w-8 sm:h-8 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
                     <path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
                     <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
