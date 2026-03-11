@@ -10,6 +10,7 @@ export interface RaceConfig {
   totalDuration: number; // ms — time for the WINNER to finish (minimum 8000)
   participantCount: number;
   predeterminedWinner: number; // index
+  rubberBandScale?: number; // 0~1 — 낮을수록 부드러운 보정 (모바일용). 기본 1.0
 }
 
 /** 기준 프레임 간격 (60fps = 16.67ms) */
@@ -17,18 +18,20 @@ const REF_DT = 16.67;
 
 export function createRaceEngine(config: RaceConfig) {
   const { totalDuration, participantCount, predeterminedWinner } = config;
+  const rbScale = config.rubberBandScale ?? 1.0;
   const finalPhaseStart = totalDuration - 2500;
 
+  // 뷰포트 기반 러버밴드 파라미터: 좁은 화면일수록 데드존 넓게, 보정 완만하게
+  const rbDeadzone = 4 + (1 - rbScale) * 4; // 4(데스크톱) ~ 8(모바일)
+  const rbDampRange = 30 + (1 - rbScale) * 15; // 30 ~ 45
+
   // ── 각 달팽이의 고유 특성 ──
-  // 모든 달팽이가 비슷한 속도, 사인파로 자연스러운 엎치락뒤치락
   const snails = Array.from({ length: participantCount }, (_, i) => {
     const isWinner = i === predeterminedWinner;
     return {
-      // 기본 순항 속도: 모두 거의 같게
       cruiseRate: isWinner
         ? 0.93 + Math.random() * 0.03 // 0.93–0.96
-        : 0.88 + Math.random() * 0.07, // 0.88–0.95 (우승자와 겹침)
-      // 사인파 — 진폭을 작게 유지 (±10% 이내 변동)
+        : 0.88 + Math.random() * 0.07, // 0.88–0.95
       wave1: { freq: 0.3 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.04 },
       wave2: { freq: 0.7 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2, amp: 0.02 + Math.random() * 0.03 },
       wave3: { freq: 1.2 + Math.random() * 1.5, phase: Math.random() * Math.PI * 2, amp: 0.01 + Math.random() * 0.02 },
@@ -39,7 +42,6 @@ export function createRaceEngine(config: RaceConfig) {
   const finishOrder: number[] = [];
   const finishedSet = new Set<number>();
   let lastTimestamp = 0;
-  // 러버밴드용 보정 진행도 — dt 캡과 동기화
   let smoothProgress = 0;
 
   const _state: RaceState = {
@@ -51,21 +53,8 @@ export function createRaceEngine(config: RaceConfig) {
   };
   const frameFinishers: { index: number; overshoot: number }[] = [];
 
-  function update(elapsed: number): RaceState {
-    const rawDt = elapsed - lastTimestamp;
-    lastTimestamp = elapsed;
-
-    _state.elapsedTime = elapsed;
-    _state.finished = false;
-
-    // dt 상한: 탭 전환 등으로 큰 점프 방지 (최대 50ms ≈ 20fps)
-    const dt = Math.min(rawDt, 50);
-
-    if (dt <= 0 || elapsed <= 0) {
-      return _state;
-    }
-
-    // smoothProgress: dt 캡에 맞춰 진행도도 점진적으로 증가 (탭 전환 시 점프 방지)
+  /** 단일 시뮬레이션 틱 (내부용) */
+  function tick(dt: number, elapsed: number): void {
     smoothProgress = Math.min(smoothProgress + dt / totalDuration, 1);
     const timeSec = elapsed / 1000;
     const inFinalPhase = elapsed >= finalPhaseStart;
@@ -85,28 +74,23 @@ export function createRaceEngine(config: RaceConfig) {
       const w2 = Math.sin(timeSec * snail.wave2.freq + snail.wave2.phase) * snail.wave2.amp;
       const w3 = Math.sin(timeSec * snail.wave3.freq + snail.wave3.phase) * snail.wave3.amp;
 
-      // 속도 배율: 0.9 ~ 1.1 범위로 제한 (부스터/급정지 없음)
       const speedMul = Math.max(0.9, Math.min(1.1, 1.0 + w1 + w2 + w3));
 
-      // 기본 이동량
       const baseMovement = snail.cruiseRate * (dt / totalDuration) * 100;
       let movement = baseMovement * speedMul;
 
       if (winnerFinished) {
-        // 우승자 통과 후: 나머지 자유 전진
         positions[i] += movement * 1.2;
       } else {
         // ── 소프트 페이싱: smoothProgress 기반 러버밴드 ──
         const expectedPos = snail.cruiseRate * smoothProgress * 100;
         const deviation = positions[i] - expectedPos;
 
-        if (deviation > 4) {
-          // 앞서면 살짝 감속 (급정지 없이)
-          const dampFactor = Math.max(0.5, 1 - (deviation - 4) / 30);
+        if (deviation > rbDeadzone) {
+          const dampFactor = Math.max(0.5, 1 - (deviation - rbDeadzone) / rbDampRange);
           movement *= dampFactor;
-        } else if (deviation < -4) {
-          // 뒤처지면 살짝 가속 (부스터 없이)
-          movement *= Math.min(1.12, 1 + (-deviation - 4) / 40);
+        } else if (deviation < -rbDeadzone) {
+          movement *= Math.min(1.12, 1 + (-deviation - rbDeadzone) / 40);
         }
 
         positions[i] += movement;
@@ -115,18 +99,16 @@ export function createRaceEngine(config: RaceConfig) {
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
-          // easeIn 커브: 처음엔 미미하다가 끝에 살짝 앞섬
           const eased = finalProgress * finalProgress;
           const winTarget = 76 + eased * 24;
           const gap = winTarget - positions[i];
           if (gap > 0) {
-            // 작은 convergence → 한 프레임에 최대 gap*0.05 이동
             const convergence = 1 - Math.pow(1 - 0.05, scale);
             positions[i] += gap * convergence;
           }
         }
 
-        // ── 패배자: 우승자 추월 시 미세 감속 (뒤로 가지는 않음) ──
+        // ── 패배자: 우승자 추월 시 미세 감속 ──
         if (!isWinner && inFinalPhase) {
           const winnerPos = positions[predeterminedWinner];
           if (positions[i] > winnerPos + 0.5) {
@@ -134,7 +116,7 @@ export function createRaceEngine(config: RaceConfig) {
           }
         }
 
-        // ── 우승자 최소 보장: 위치를 덮어쓰지 않고 부드럽게 당김 ──
+        // ── 우승자 최소 보장: 부드러운 당김 ──
         if (isWinner) {
           const minPos = smoothProgress * 50;
           if (positions[i] < minPos) {
@@ -147,7 +129,6 @@ export function createRaceEngine(config: RaceConfig) {
 
       positions[i] = Math.max(0, Math.min(100, positions[i]));
 
-      // 결승선 통과 감지
       if (positions[i] >= 99.5) {
         const overshoot = positions[i] - 99.5;
         positions[i] = 100;
@@ -156,7 +137,6 @@ export function createRaceEngine(config: RaceConfig) {
       }
     }
 
-    // 동프레임 통과자 정렬
     if (frameFinishers.length > 1) {
       frameFinishers.sort((a, b) => b.overshoot - a.overshoot);
     }
@@ -165,7 +145,43 @@ export function createRaceEngine(config: RaceConfig) {
     }
 
     _state.finished = finishedSet.size === participantCount;
+  }
 
+  /**
+   * 매 프레임 호출. Catch-up 서브스테핑으로 탭 전환 시에도 동기화 유지.
+   * React 상태에 넘길 때만 snapshot()을 사용하세요.
+   */
+  function update(elapsed: number): RaceState {
+    const rawDt = elapsed - lastTimestamp;
+
+    _state.elapsedTime = elapsed;
+    _state.finished = false;
+
+    if (rawDt <= 0 || elapsed <= 0) {
+      lastTimestamp = elapsed;
+      return _state;
+    }
+
+    // ── Catch-up 서브스테핑 ──
+    // 탭 전환 등으로 rawDt가 클 때, 16.67ms 단위로 분할 실행
+    // 최대 500ms(~30틱)까지 시뮬레이션하여 메인 스레드 프리즈 방지
+    const MAX_CATCHUP_MS = 500;
+    const simulateMs = Math.min(rawDt, MAX_CATCHUP_MS);
+    const steps = Math.max(1, Math.round(simulateMs / REF_DT));
+    const stepDt = simulateMs / steps; // ≈ 16.67ms
+
+    // 500ms 초과분은 smoothProgress만 빠르게 전진 (러버밴드가 자연스럽게 따라잡음)
+    if (rawDt > MAX_CATCHUP_MS) {
+      smoothProgress = Math.min(smoothProgress + (rawDt - MAX_CATCHUP_MS) / totalDuration, 1);
+    }
+
+    const baseElapsed = elapsed - simulateMs;
+    for (let s = 0; s < steps; s++) {
+      tick(stepDt, baseElapsed + stepDt * (s + 1));
+      if (_state.finished) break;
+    }
+
+    lastTimestamp = elapsed;
     return _state;
   }
 

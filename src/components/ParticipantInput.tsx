@@ -16,6 +16,7 @@ const SNAIL_TAG_COLORS = [
 /** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 (원본 유지) */
 function parseNames(text: string): {
   names: string[];
+  displayNames: string[];
   tooLongIndices: Set<number>;
 } {
   const tooLongIndices = new Set<number>();
@@ -28,7 +29,20 @@ function parseNames(text: string): {
     if (n.length > 8) tooLongIndices.add(i);
   });
 
-  return { names, tooLongIndices };
+  // 동명이인 구별: 철수, 철수 → 철수(1), 철수(2)
+  const nameCount = new Map<string, number>();
+  for (const n of names) {
+    nameCount.set(n, (nameCount.get(n) || 0) + 1);
+  }
+  const nameIndex = new Map<string, number>();
+  const displayNames = names.map((name) => {
+    if ((nameCount.get(name) || 0) <= 1) return name;
+    const idx = (nameIndex.get(name) || 0) + 1;
+    nameIndex.set(name, idx);
+    return `${name}(${idx})`;
+  });
+
+  return { names, displayNames, tooLongIndices };
 }
 
 export default function ParticipantInput({ onStart }: Props) {
@@ -36,10 +50,11 @@ export default function ParticipantInput({ onStart }: Props) {
   const [shaking, setShaking] = useState(false);
   const prevTooLongCount = useRef(0);
 
-  const { names, tooLongIndices } = parseNames(text);
+  const { names, displayNames, tooLongIndices } = parseNames(text);
   const validCount = Math.min(names.length, 15);
   const hasTooLong = tooLongIndices.size > 0;
-  const canStart = validCount >= 2 && !hasTooLong;
+  const hasExcess = names.length > 15;
+  const canStart = validCount >= 2 && !hasTooLong && !hasExcess;
 
   // 초과 이름이 새로 생기면 shake 트리거
   useEffect(() => {
@@ -53,7 +68,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
   function handleStart() {
     if (!canStart) return;
-    const finalNames = names.slice(0, 15);
+    const finalNames = displayNames.slice(0, 15);
     onStart(finalNames);
   }
 
@@ -146,11 +161,11 @@ export default function ParticipantInput({ onStart }: Props) {
             animate={{ opacity: 1 }}
             className="mt-4 flex flex-wrap gap-2"
           >
-            {names.slice(0, 15).map((name, i) => {
+            {displayNames.slice(0, 15).map((displayName, i) => {
               const isTooLong = tooLongIndices.has(i);
               return (
                 <motion.span
-                  key={`${i}-${name}`}
+                  key={`${i}-${displayName}`}
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: i * 0.03, duration: 0.2 }}
@@ -164,10 +179,10 @@ export default function ParticipantInput({ onStart }: Props) {
                   style={{ backgroundColor: SNAIL_TAG_COLORS[i] }}
                 >
                   <span className="text-base" role="img" aria-label="달팽이">🐌</span>
-                  <span className="max-w-[100px] truncate">{name}</span>
+                  <span className="max-w-[100px] truncate">{displayName}</span>
                   {isTooLong && (
                     <span className="text-clay-danger text-[10px] font-bold shrink-0">
-                      {name.length}/8
+                      {names[i].length}/8
                     </span>
                   )}
                 </motion.span>
@@ -227,6 +242,11 @@ export default function ParticipantInput({ onStart }: Props) {
           {hasTooLong && (
             <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
               8자를 초과한 이름이 있습니다 — 줄여주세요!
+            </p>
+          )}
+          {hasExcess && (
+            <p className="text-clay-danger text-xs font-body font-semibold" role="alert">
+              최대 15명까지 참가할 수 있습니다 — {names.length - 15}명을 줄여주세요!
             </p>
           )}
           {validCount < 2 && (

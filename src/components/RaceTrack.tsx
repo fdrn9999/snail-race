@@ -133,9 +133,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
     const engine = engineRef.current;
     let t = lastTimestamp.current;
     let state = engine.update(t);
-    while (!state.finished) {
+    let failsafe = 0;
+    while (!state.finished && failsafe < 2000) {
       t += 16.67;
       state = engine.update(t);
+      failsafe++;
     }
 
     const trackEl = trackRef.current;
@@ -146,6 +148,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         if (el) {
           const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
           el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
+          el.style.zIndex = `${20 + Math.round(state.positions[i])}`;
         }
       }
     }
@@ -164,10 +167,15 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
 
+    // 뷰포트 너비 기반 러버밴드 스케일 (좁은 화면 = 부드러운 보정)
+    const trackWidth = trackRef.current?.clientWidth ?? 800;
+    const rubberBandScale = Math.min(1, trackWidth / 800);
+
     const engine = createRaceEngine({
       totalDuration: RACE_DURATION,
       participantCount: participants.length,
       predeterminedWinner: winnerId,
+      rubberBandScale,
     });
 
     engineRef.current = engine;
@@ -202,12 +210,13 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
           const trackEl = trackRef.current;
           if (trackEl) {
-            const trackWidth = trackEl.clientWidth;
+            const tw = trackEl.clientWidth;
             for (let i = 0; i < participants.length; i++) {
               const el = snailRefs.current[i];
               if (el) {
-                const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
+                const pxPos = (state.positions[i] / 100) * (tw - 60);
                 el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
+                el.style.zIndex = `${20 + Math.round(state.positions[i])}`;
               }
             }
           }
@@ -311,19 +320,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
           </p>
         </div>
 
-        {/* ═══ Ranking Panel (header area, always visible during race) ═══ */}
-        <AnimatePresence>
-          {(isRacing || raceFinished) && raceState && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="overflow-hidden"
-            >
-              <div className="bg-clay-card rounded-3xl border-[3px] border-clay-border clay-shadow-lg
-                              px-4 sm:px-5 py-3 sm:py-3.5">
-
+        {/* ═══ Ranking Panel (카운트다운부터 공간 확보 → 레이아웃 시프트 방지) ═══ */}
+        {(countdown !== null || isRacing || raceFinished) && (
+          <div className="bg-clay-card rounded-3xl border-[3px] border-clay-border clay-shadow-lg
+                          px-4 sm:px-5 py-3 sm:py-3.5">
+            {raceState ? (
+              <>
                 {/* Label */}
                 <div className="text-center mb-2">
                   <span className={`font-heading font-bold text-[11px] sm:text-xs tracking-wide uppercase
@@ -403,10 +405,17 @@ export default function RaceTrack({ participants, onReset }: Props) {
                     </div>
                   </div>
                 )}
+              </>
+            ) : (
+              /* 카운트다운 중 플레이스홀더 — 공간만 확보 */
+              <div className="text-center py-1">
+                <span className="font-heading font-bold text-[11px] sm:text-xs tracking-wide uppercase text-clay-muted">
+                  준비 중...
+                </span>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ══════ Race Track ══════ */}
