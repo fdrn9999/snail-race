@@ -56,8 +56,6 @@ function getLaneHeights(count: number): [number, number] {
 export default function RaceTrack({ participants, onReset }: Props) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [isRacing, setIsRacing] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-  const [resultMinimized, setResultMinimized] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showGo, setShowGo] = useState(false);
   const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(false);
@@ -66,7 +64,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const startTimeRef = useRef<number>(0);
   const lastTimestamp = useRef<number>(0);
   const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const snailRefs = useRef<(HTMLDivElement | null)[]>([]);
   const slimeRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -156,11 +153,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
     setRaceState(engine.snapshot());
     setIsRacing(false);
-    setTimeout(() => {
-      setShowResult(true);
-      setResultMinimized(false);
-      fireConfetti();
-    }, 300);
+    setTimeout(() => fireConfetti(), 300);
   }, [isRacing, fireConfetti, participants.length]);
 
   const startRace = useCallback(() => {
@@ -179,8 +172,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
     frameCountRef.current = 0;
     prevFinishCountRef.current = 0;
     setRaceState(null);
-    setShowResult(false);
-    setResultMinimized(false);
 
     setCountdown(3);
     let count = 3;
@@ -235,11 +226,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
               const dustEl = dustRefs.current[i];
               if (dustEl) dustEl.style.display = "none";
             }
-            setTimeout(() => {
-              setShowResult(true);
-              setResultMinimized(false);
-              fireConfetti();
-            }, 400);
+            setTimeout(() => fireConfetti(), 400);
           }
         };
         animFrameRef.current = requestAnimationFrame(animate);
@@ -252,21 +239,14 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const handleRerace = () => {
     cleanup();
     setRaceState(null);
-    setShowResult(false);
-    setResultMinimized(false);
     setIsRacing(false);
     setCountdown(null);
     setShowGo(false);
     setTimeout(() => startRace(), 80);
   };
 
-  const winnerName =
-    raceState && showResult ? participants[raceState.winnerId] : null;
   const rankings = raceState?.finishOrder || [];
-
-  // 실시간 도착 피드 (트랙 내부 플로팅 — 최근 3명만 표시)
-  const liveFinishers = raceState?.finishOrder || [];
-  const recentFinishers = liveFinishers.slice(-3);
+  const raceFinished = !!raceState?.finished;
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
@@ -337,7 +317,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Lanes area */}
         <div className="bg-[#4a8c3f]" ref={trackRef}>
           {participants.map((name, index) => {
-            const isWinner = showResult && raceState?.winnerId === index;
+            const isWinner = raceFinished && raceState?.winnerId === index;
             const isEven = index % 2 === 0;
 
             return (
@@ -475,40 +455,75 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Bottom rail */}
         <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
 
-        {/* ═══ Floating Live Ticker (inside track) ═══ */}
+        {/* ═══ Ranking Panel (inside track, right side) ═══ */}
         <AnimatePresence>
-          {!showResult && raceState && recentFinishers.length > 0 && (
+          {raceState && rankings.length > 0 && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 16 }}
               transition={{ duration: 0.25 }}
-              className="absolute bottom-8 sm:bottom-9 left-2 sm:left-3 z-20 pointer-events-none"
+              className="absolute top-12 sm:top-14 right-1.5 sm:right-2.5 z-20
+                         w-[108px] sm:w-36
+                         bg-white/65 backdrop-blur-md rounded-xl
+                         border-2 border-clay-border/12 shadow-lg
+                         overflow-hidden flex flex-col
+                         max-h-[calc(100%-60px)] sm:max-h-[calc(100%-68px)]"
             >
-              <div className="flex flex-col gap-1">
-                {recentFinishers.map((participantIdx) => {
-                  const rank = liveFinishers.indexOf(participantIdx);
-                  const name = participants[participantIdx];
+              {/* Header */}
+              <div className={`shrink-0 px-2 sm:px-2.5 py-1 sm:py-1.5 border-b border-clay-border/10
+                               ${raceFinished ? "bg-clay-gold/25" : "bg-white/40"}`}>
+                <span className="font-heading font-bold text-[10px] sm:text-xs text-clay-text flex items-center gap-1">
+                  {raceFinished ? (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                        <path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                        <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                        <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                      </svg>
+                      최종 순위
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                        <line x1="4" y1="22" x2="4" y2="15" />
+                      </svg>
+                      실시간
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Scrollable ranking list */}
+              <div className="overflow-y-auto p-1 space-y-px scrollbar-thin">
+                {rankings.map((participantIdx, rank) => {
                   const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : null;
                   const isFirst = rank === 0;
+                  const isLast = rank === rankings.length - 1 && raceFinished;
 
                   return (
                     <motion.div
-                      key={`ticker-${participantIdx}`}
-                      initial={{ opacity: 0, x: -20, scale: 0.85 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      transition={{ type: "spring", damping: 20, stiffness: 300 }}
-                      className={`flex items-center gap-1.5 px-2 py-1 rounded-lg backdrop-blur-md
+                      key={participantIdx}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className={`flex items-center gap-1 px-1.5 py-[3px] rounded-lg
                         ${isFirst
-                          ? "bg-clay-gold/80 border border-clay-border/20"
-                          : "bg-white/75 border border-clay-border/10"
+                          ? "bg-clay-gold/35"
+                          : isLast
+                            ? "bg-clay-peach/25"
+                            : ""
                         }`}
                     >
-                      <span className="font-heading font-bold text-[10px] text-clay-border">
-                        {medal || `${rank + 1}등`}
+                      <span className={`font-heading font-bold text-[10px] sm:text-[11px] w-5 shrink-0 text-center
+                        ${isFirst ? "text-clay-border" : "text-clay-muted"}`}>
+                        {medal || `${rank + 1}`}
                       </span>
-                      <span className="font-heading font-bold text-[10px] sm:text-[11px] text-clay-text truncate max-w-[60px] sm:max-w-[80px]">
-                        {name}
+                      <span className={`font-heading font-bold text-[10px] sm:text-[11px] truncate
+                        ${isFirst ? "text-clay-text" : "text-clay-text/75"}`}>
+                        {participants[participantIdx]}
                       </span>
                     </motion.div>
                   );
@@ -518,7 +533,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
           )}
         </AnimatePresence>
 
-        {/* Skip button */}
+        {/* Skip button (left side) */}
         <AnimatePresence>
           {isRacing && (
             <motion.button
@@ -528,7 +543,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
               transition={{ delay: 3, duration: 0.3 }}
               whileTap={{ scale: 0.9 }}
               onClick={handleSkip}
-              className="absolute top-12 sm:top-14 right-2 sm:right-3 z-25
+              className="absolute top-12 sm:top-14 left-2 sm:left-3 z-25
                          py-1.5 px-3 bg-white/90 text-clay-muted font-heading font-bold
                          rounded-xl text-xs border-2 border-clay-border/15
                          shadow-md cursor-pointer backdrop-blur-sm
@@ -664,132 +679,30 @@ export default function RaceTrack({ participants, onReset }: Props) {
         )}
       </div>
 
-      {/* Full rankings */}
+      {/* Winner announcement (below track, compact) */}
       <AnimatePresence>
-        {showResult && winnerName && rankings.length > 0 && (
+        {raceFinished && raceState && (
           <motion.div
-            ref={resultRef}
-            initial={{ opacity: 0, y: 32, scale: 0.85 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ type: "spring", damping: 18, stiffness: 200 }}
-            className="mt-8 pb-8 max-w-md mx-auto"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 250 }}
+            className="mt-4 text-center"
           >
-            <div className="bg-clay-card rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden">
-              {/* Minimize/Expand header */}
-              <button
-                type="button"
-                onClick={() => setResultMinimized((v) => !v)}
-                className="w-full flex items-center justify-between px-5 sm:px-7 py-3
-                           bg-clay-gold/20 hover:bg-clay-gold/30 transition-colors cursor-pointer"
-              >
-                <span className="flex items-center gap-2 font-heading font-bold text-clay-text text-sm">
-                  <span>🏆</span>
-                  <span>{winnerName}</span>
-                  <span className="text-clay-muted font-body text-xs font-semibold">1등!</span>
-                </span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className={`w-5 h-5 text-clay-muted transition-transform duration-200 ${resultMinimized ? "" : "rotate-180"}`}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-
-              {/* Collapsible content */}
-              <AnimatePresence initial={false}>
-                {!resultMinimized && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="p-5 sm:p-7 pt-3">
-                      {/* Winner hero */}
-                      <div className="text-center mb-5 animate-trophy-pulse">
-                        <div className="mx-auto mb-2">
-                          <SnailSvg
-                            shellColor={SHELL_COLORS[raceState!.winnerId % SHELL_COLORS.length]}
-                            size={64}
-                          />
-                        </div>
-                        <div className="mx-auto w-12 h-12 bg-clay-gold rounded-xl border-[3px] border-clay-border/20
-                                        flex items-center justify-center clay-shadow mb-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                            <path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-                          </svg>
-                        </div>
-                        <p className="font-heading text-2xl sm:text-3xl font-bold text-clay-text">
-                          {winnerName}
-                        </p>
-                        <p className="font-body text-sm text-clay-muted font-semibold mt-0.5">
-                          축하합니다!
-                        </p>
-                      </div>
-
-                      <div className="h-[2px] bg-clay-border/10 rounded-full mb-4" />
-
-                      {/* Full ranking list */}
-                      <div className="space-y-1.5">
-                        {rankings.map((participantIdx, rank) => {
-                          const name = participants[participantIdx];
-                          const isFirst = rank === 0;
-                          const isLast = rank === rankings.length - 1;
-                          const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : null;
-
-                          return (
-                            <motion.div
-                              key={participantIdx}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: rank * 0.06, duration: 0.25 }}
-                              className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-colors
-                                ${isFirst
-                                  ? "bg-clay-gold/30 border-clay-gold"
-                                  : isLast
-                                    ? "bg-clay-peach/20 border-clay-peach/40"
-                                    : "bg-clay-lilac/15 border-transparent"
-                                }`}
-                            >
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                                               font-heading font-bold text-sm border-2
-                                ${isFirst
-                                  ? "bg-clay-gold border-clay-border/20 text-clay-border"
-                                  : rank <= 2
-                                    ? "bg-white border-clay-border/15 text-clay-text"
-                                    : "bg-clay-bg border-clay-border/10 text-clay-muted"
-                                }`}>
-                                {medal || `${rank + 1}`}
-                              </div>
-                              <SnailSvg
-                                shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
-                                size={28}
-                              />
-                              <span className={`font-heading font-bold truncate
-                                ${isFirst
-                                  ? "text-base text-clay-text"
-                                  : "text-sm text-clay-text/80"
-                                }`}>
-                                {name}
-                              </span>
-                              <span className={`ml-auto shrink-0 font-body text-xs font-semibold
-                                ${isFirst ? "text-[#E17055]" : "text-clay-muted/60"}`}>
-                                {rank + 1}등
-                              </span>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="inline-flex items-center gap-2.5 px-5 py-2.5
+                            bg-clay-gold/25 rounded-2xl border-2 border-clay-gold/50">
+              <SnailSvg
+                shellColor={SHELL_COLORS[raceState.winnerId % SHELL_COLORS.length]}
+                size={32}
+              />
+              <div className="text-left">
+                <p className="font-heading text-lg sm:text-xl font-bold text-clay-text leading-tight">
+                  {participants[raceState.winnerId]}
+                </p>
+                <p className="font-body text-xs text-clay-muted font-semibold">
+                  1등 — 축하합니다!
+                </p>
+              </div>
             </div>
           </motion.div>
         )}
