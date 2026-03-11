@@ -20,7 +20,7 @@ const RACE_DURATION = 10000;
 /* ── SVG Snail (cartoon) ── */
 function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ transform: "scaleX(-1)" }} aria-hidden="true">
       <ellipse cx="32" cy="46" rx="28" ry="10" fill="#FFD993" stroke="#C68B3E" strokeWidth="2" />
       <ellipse cx="28" cy="44" rx="18" ry="5" fill="#FFE8B8" opacity="0.6" />
       <circle cx="36" cy="30" r="18" fill={shellColor} stroke="#2D3436" strokeWidth="2.5" />
@@ -58,6 +58,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const engineRef = useRef<ReturnType<typeof createRaceEngine> | null>(null);
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
+  const lastTimestamp = useRef<number>(0);
   const countIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -98,21 +99,40 @@ export default function RaceTrack({ participants, onReset }: Props) {
     }, 200);
   }, []);
 
-  /** 레이스를 즉시 종료 (스킵) */
+  /** 레이스를 즉시 종료 (스킵) — 엔진을 빠르게 시뮬레이션 */
   const handleSkip = useCallback(() => {
     if (!engineRef.current || !isRacing) return;
     cancelAnimationFrame(animFrameRef.current);
 
-    // 엔진을 끝까지 돌려서 최종 상태 확보
-    const finalState = engineRef.current.update(RACE_DURATION + 100);
-    setRaceState(finalState);
+    // 엔진을 100ms 단위로 빠르게 돌려 전체 순위 확정
+    let t = lastTimestamp.current;
+    let state = engineRef.current.update(t);
+    while (!state.finished) {
+      t += 100;
+      state = engineRef.current.update(t);
+    }
+
+    // 최종 위치를 DOM에도 반영
+    const trackEl = trackRef.current;
+    if (trackEl) {
+      const trackWidth = trackEl.clientWidth;
+      for (let i = 0; i < participants.length; i++) {
+        const el = snailRefs.current[i];
+        if (el) {
+          const pxPos = (state.positions[i] / 100) * (trackWidth - 60);
+          el.style.transform = `translateY(-50%) translateX(${pxPos}px)`;
+        }
+      }
+    }
+
+    setRaceState(state);
     setIsRacing(false);
     setTimeout(() => {
       setShowResult(true);
       fireConfetti();
       scrollToResult();
     }, 300);
-  }, [isRacing, fireConfetti, scrollToResult]);
+  }, [isRacing, fireConfetti, scrollToResult, participants.length]);
 
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
@@ -143,6 +163,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         const animate = (timestamp: number) => {
           const elapsed = timestamp - startTimeRef.current;
+          lastTimestamp.current = elapsed;
           const state = engine.update(elapsed);
 
           // GPU 가속: DOM 직접 조작으로 translateX 적용
@@ -189,6 +210,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
   const winnerName =
     raceState && showResult ? participants[raceState.winnerId] : null;
+  const rankings = raceState?.finishOrder || [];
 
   // 레인 높이 (참가자 수에 따라 유동)
   const laneHeightMobile = getLaneHeight(participants.length, false);
@@ -502,45 +524,103 @@ export default function RaceTrack({ participants, onReset }: Props) {
         )}
       </div>
 
-      {/* Winner announcement */}
+      {/* Full rankings */}
       <AnimatePresence>
-        {showResult && winnerName && (
+        {showResult && winnerName && rankings.length > 0 && (
           <motion.div
             ref={resultRef}
             initial={{ opacity: 0, y: 32, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ type: "spring", damping: 18, stiffness: 200 }}
-            className="mt-8 text-center pb-8"
+            className="mt-8 pb-8 max-w-md mx-auto"
           >
-            <div className="inline-block bg-clay-card rounded-3xl p-6 sm:p-8 border-[3px] border-clay-border clay-shadow-lg">
-              <div className="animate-trophy-pulse">
-                <div className="mx-auto mb-3">
+            <div className="bg-clay-card rounded-3xl p-5 sm:p-7 border-[3px] border-clay-border clay-shadow-lg">
+              {/* Winner hero */}
+              <div className="text-center mb-5 animate-trophy-pulse">
+                <div className="mx-auto mb-2">
                   <SnailSvg
                     shellColor={SHELL_COLORS[raceState!.winnerId % SHELL_COLORS.length]}
-                    size={72}
+                    size={64}
                   />
                 </div>
-
-                <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 bg-clay-gold rounded-2xl border-[3px] border-clay-border/20
-                                flex items-center justify-center clay-shadow mb-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 sm:w-8 sm:h-8 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <div className="mx-auto w-12 h-12 bg-clay-gold rounded-xl border-[3px] border-clay-border/20
+                                flex items-center justify-center clay-shadow mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-clay-border" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
                     <path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
                     <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
                     <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
                   </svg>
                 </div>
-
-                <p className="font-heading text-lg sm:text-xl font-bold text-[#E17055] mb-1">
-                  1등
-                </p>
-                <p className="font-heading text-3xl sm:text-5xl font-bold text-clay-text mb-2">
+                <p className="font-heading text-2xl sm:text-3xl font-bold text-clay-text">
                   {winnerName}
                 </p>
-                <p className="font-body text-base sm:text-lg text-clay-muted font-semibold">
+                <p className="font-body text-sm text-clay-muted font-semibold mt-0.5">
                   축하합니다!
                 </p>
+              </div>
+
+              {/* Divider */}
+              <div className="h-[2px] bg-clay-border/10 rounded-full mb-4" />
+
+              {/* Full ranking list */}
+              <div className="space-y-1.5">
+                {rankings.map((participantIdx, rank) => {
+                  const name = participants[participantIdx];
+                  const isFirst = rank === 0;
+                  const isLast = rank === rankings.length - 1;
+                  const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : null;
+
+                  return (
+                    <motion.div
+                      key={participantIdx}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: rank * 0.06, duration: 0.25 }}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-colors
+                        ${isFirst
+                          ? "bg-clay-gold/30 border-clay-gold"
+                          : isLast
+                            ? "bg-clay-peach/20 border-clay-peach/40"
+                            : "bg-clay-lilac/15 border-transparent"
+                        }`}
+                    >
+                      {/* Rank number */}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
+                                       font-heading font-bold text-sm border-2
+                        ${isFirst
+                          ? "bg-clay-gold border-clay-border/20 text-clay-border"
+                          : rank <= 2
+                            ? "bg-white border-clay-border/15 text-clay-text"
+                            : "bg-clay-bg border-clay-border/10 text-clay-muted"
+                        }`}>
+                        {medal || `${rank + 1}`}
+                      </div>
+
+                      {/* Snail icon */}
+                      <SnailSvg
+                        shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
+                        size={28}
+                      />
+
+                      {/* Name */}
+                      <span className={`font-heading font-bold truncate
+                        ${isFirst
+                          ? "text-base text-clay-text"
+                          : "text-sm text-clay-text/80"
+                        }`}>
+                        {name}
+                      </span>
+
+                      {/* Rank suffix */}
+                      <span className={`ml-auto shrink-0 font-body text-xs font-semibold
+                        ${isFirst ? "text-[#E17055]" : "text-clay-muted/60"}`}>
+                        {rank + 1}등
+                      </span>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
           </motion.div>
