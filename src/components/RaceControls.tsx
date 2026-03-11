@@ -16,7 +16,7 @@ export default function RaceControls({
   isRacing, countdown, raceState, startRace, handleRerace, onReset,
 }: Props) {
   return (
-    <div className="shrink-0 flex justify-center gap-3 mt-2 sm:mt-3">
+    <div className="flex justify-center gap-3">
       {!isRacing && !raceState && countdown === null && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}

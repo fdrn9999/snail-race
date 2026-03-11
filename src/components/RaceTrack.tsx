@@ -713,16 +713,29 @@ export default function RaceTrack({ participants, onReset }: Props) {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      <RaceControls
-        isRacing={isRacing}
-        countdown={countdown}
-        raceState={raceState}
-        startRace={startRace}
-        handleRerace={handleRerace}
-        onReset={onReset}
-      />
+        {/* Controls overlay (inside track) */}
+        <AnimatePresence>
+          {((!isRacing && !raceState && countdown === null) || (!isRacing && raceState?.finished)) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 flex items-center justify-center z-30 bg-black/30 backdrop-blur-[2px]"
+            >
+              <RaceControls
+                isRacing={isRacing}
+                countdown={countdown}
+                raceState={raceState}
+                startRace={startRace}
+                handleRerace={handleRerace}
+                onReset={onReset}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
     </div>
   );
