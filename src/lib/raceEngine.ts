@@ -131,22 +131,27 @@ export function createRaceEngine(config: RaceConfig) {
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
-          const eased = finalProgress * finalProgress;
+          // 서서히 강해지는 수렴 — 초반엔 거의 안 당기고, 후반에만 강하게
+          const eased = finalProgress * finalProgress * finalProgress;
           const winTarget = 76 + eased * 24;
           const gap = winTarget - positions[i];
           if (gap > 0) {
-            // dt 기반 선형 보간 — FPS 무관 일관된 수렴
-            const convergence = Math.min(1, 0.003 * dt);
+            // finalProgress에 비례하여 수렴 강도 증가 (초반 급가속 방지)
+            const convergence = Math.min(1, 0.001 * dt * (1 + finalProgress * 2));
             positions[i] += gap * convergence;
           }
         }
 
         if (!isWinner && inFinalPhase) {
+          const finalProgress =
+            (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
           const winnerPos = positions[predeterminedWinner];
           const lead = positions[i] - winnerPos;
           if (lead > 0.5) {
-            // 앞서는 정도에 비례하여 부드럽게 감속 (급격한 차단 대신 점진적)
-            const dampFactor = Math.max(0.92, 1 - (lead - 0.5) / 60);
+            // 감속 강도가 finalPhase 진행도에 따라 점진적으로 증가
+            // 초반엔 거의 못 느끼다가, 후반에만 확실히 적용
+            const intensity = finalProgress * finalProgress;
+            const dampFactor = Math.max(0.92, 1 - (lead - 0.5) / 60 * intensity);
             movement *= dampFactor;
           }
         }
@@ -211,11 +216,13 @@ export function createRaceEngine(config: RaceConfig) {
     }
     remaining.sort((a, b) => b.score - a.score);
 
-    // 순위별 위치 분산 — 결승선에 뭉치지 않도록
+    // 순위별 위치 분산 — 랜덤 오프셋으로 자연스러운 간격
     for (let j = 0; j < remaining.length; j++) {
       const r = remaining[j];
       const rank = finishOrder.length; // 현재까지의 총 순위 (0-based)
-      positions[r.index] = Math.max(55, 100 - rank * 3);
+      const basePos = 100 - rank * 3;
+      const jitter = (Math.random() - 0.5) * 3; // ±1.5% 랜덤 오프셋
+      positions[r.index] = Math.max(45, basePos + jitter);
       finishedSet.add(r.index);
       finishOrder.push(r.index);
     }
