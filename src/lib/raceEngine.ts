@@ -19,16 +19,19 @@ export function createRaceEngine(config: RaceConfig) {
   const { totalDuration, participantCount, predeterminedWinner } = config;
   const finalPhaseStart = totalDuration - 2000;
 
-  const snailSpeeds = Array.from({ length: participantCount }, () => ({
-    baseSpeed: 0.3 + Math.random() * 0.4,
-    variance: 0.2 + Math.random() * 0.3,
-    burstChance: 0.02 + Math.random() * 0.03,
-  }));
-
-  // 패배자별 최종 도착 목표 위치 (고정값 — 투명벽 대신 자연스러운 감속 목표)
-  const snailFinalTargets = Array.from({ length: participantCount }, (_, i) => {
-    if (i === predeterminedWinner) return 100;
-    return 82 + Math.random() * 15; // 82~97 사이에 넓게 분산 (고무줄 현상 완화)
+  // 각 달팽이의 고유 특성 — 생성 시 확정
+  const snails = Array.from({ length: participantCount }, (_, i) => {
+    const isWinner = i === predeterminedWinner;
+    return {
+      baseSpeed: 0.3 + Math.random() * 0.4,
+      variance: 0.2 + Math.random() * 0.3,
+      burstChance: 0.02 + Math.random() * 0.03,
+      // 개인 페이스: 레이스 진행도 대비 어디까지 갈지 결정
+      // 우승자는 항상 빠른 축, 나머지는 넓게 분산
+      cruiseRate: isWinner
+        ? 0.88 + Math.random() * 0.08 // 0.88–0.96
+        : 0.45 + Math.random() * 0.45, // 0.45–0.90 (넓은 분산)
+    };
   });
 
   const positions = new Array(participantCount).fill(0);
@@ -36,7 +39,6 @@ export function createRaceEngine(config: RaceConfig) {
   const finishedSet = new Set<number>();
   let lastTimestamp = 0;
 
-  /** dt를 기준 프레임(16.67ms)으로 정규화한 배율 */
   function dtScale(dt: number): number {
     return dt / REF_DT;
   }
@@ -60,79 +62,87 @@ export function createRaceEngine(config: RaceConfig) {
     const winnerFinished = finishedSet.has(predeterminedWinner);
     const scale = dtScale(dt);
 
-    // 이번 프레임에 결승선을 통과한 달팽이들을 모아둘 버퍼
     const frameFinishers: { index: number; overshoot: number }[] = [];
 
     for (let i = 0; i < participantCount; i++) {
       if (finishedSet.has(i)) continue;
 
-      const snail = snailSpeeds[i];
+      const snail = snails[i];
       const isWinner = i === predeterminedWinner;
 
+      // ── 기본 속도 계산 ──
       let speed = snail.baseSpeed;
-
-      // Random variance
       speed += (Math.random() - 0.5) * snail.variance * 2;
 
-      // Random burst — dt 정규화: 60fps 기준 확률 유지
       if (Math.random() < 1 - Math.pow(1 - snail.burstChance, scale)) {
         speed *= 1.5 + Math.random();
       }
-
-      // Slow down occasionally — dt 정규화
       if (Math.random() < 1 - Math.pow(1 - 0.05, scale)) {
         speed *= 0.3;
       }
 
-      const movement = speed * (dt / totalDuration) * 100;
+      let movement = speed * (dt / totalDuration) * 100;
 
       if (winnerFinished) {
+        // ── 우승자 통과 후: 나머지 달팽이들 자유 가속 ──
         const orderBias = 0.8 + Math.random() * 0.8;
         positions[i] += movement * 1.5 * orderBias;
-      } else if (inFinalPhase) {
-        const finalProgress =
-          (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
+      } else {
+        // ── 소프트 페이싱: 개인 목표 위치 기반 러버밴드 ──
+        const expectedPos = snail.cruiseRate * progress * 100;
+        const deviation = positions[i] - expectedPos;
 
-        if (isWinner) {
-          const targetPos = 75 + finalProgress * 25;
-          const currentGap = targetPos - positions[i];
-          // dt 기반 지수 보간: 주사율 무관하게 동일한 수렴 속도
-          const convergence = 1 - Math.pow(1 - 0.15, scale);
-          positions[i] += Math.max(movement, currentGap * convergence);
-        } else {
-          // Ease-out 감속: 고정 목표 위치를 향해 자연스럽게 수렴
-          const target = snailFinalTargets[i];
-          const remaining = target - positions[i];
-          if (remaining > 0.05) {
-            const easeOut = 1 - Math.pow(1 - 0.08, scale);
-            positions[i] += Math.max(movement * 0.3, remaining * easeOut);
-          } else {
-            // 목표 부근에서 미세한 흔들림 (살아있는 느낌)
-            positions[i] += (Math.random() - 0.5) * 0.1 * scale;
+        if (deviation > 6) {
+          // 목표보다 너무 앞서감 → 점진적 감속 (하드캡 아님)
+          movement *= Math.max(0.05, 1 - (deviation - 6) / 20);
+        } else if (deviation < -8) {
+          // 목표보다 뒤처짐 → 살짝 가속
+          movement *= 1.15 + Math.random() * 0.15;
+        }
+
+        positions[i] += movement;
+
+        // ── 우승자 최종 스퍼트 (마지막 2초) ──
+        if (isWinner && inFinalPhase) {
+          const finalProgress =
+            (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
+          const winTarget = 82 + finalProgress * 18; // 82→100
+          const gap = winTarget - positions[i];
+          if (gap > 0) {
+            const convergence = 1 - Math.pow(1 - 0.12, scale);
+            positions[i] += gap * convergence;
           }
         }
-      } else {
-        const maxAllowed = 75 * progress + 10;
-        positions[i] = Math.min(positions[i] + movement, maxAllowed);
 
-        if (isWinner && positions[i] < progress * 50) {
-          positions[i] = progress * 50 + Math.random() * 10;
+        // ── 패배자: 마지막 국면에서 우승자 추월 방지 ──
+        if (!isWinner && inFinalPhase) {
+          const winnerPos = positions[predeterminedWinner];
+          if (positions[i] > winnerPos - 2) {
+            const tooClose = positions[i] - (winnerPos - 2);
+            const brake = Math.max(0.02, 1 - tooClose / 8);
+            // 감속 적용 (현재 프레임에서 이동한 만큼 보정)
+            positions[i] -= movement * (1 - brake);
+          }
+        }
+
+        // ── 우승자 최소 보장: 너무 뒤처지지 않도록 ──
+        if (isWinner && positions[i] < progress * 45) {
+          positions[i] = progress * 45 + Math.random() * 8;
         }
       }
 
       positions[i] = Math.max(0, Math.min(100, positions[i]));
 
-      // 결승선 통과 감지 — 바로 push 하지 않고 버퍼에 모은다
+      // 결승선 통과 감지
       if (positions[i] >= 99.5) {
-        const overshoot = positions[i] - 99.5; // 얼마나 더 넘었는지
+        const overshoot = positions[i] - 99.5;
         positions[i] = 100;
         finishedSet.add(i);
         frameFinishers.push({ index: i, overshoot });
       }
     }
 
-    // 동프레임 통과자 처리: 초과 거리(overshoot) 내림차순 정렬
-    // → 더 많이 넘은 달팽이가 먼저 들어온 것으로 판정
+    // 동프레임 통과자 정렬
     if (frameFinishers.length > 1) {
       frameFinishers.sort((a, b) => b.overshoot - a.overshoot);
     }
