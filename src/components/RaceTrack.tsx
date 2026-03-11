@@ -466,7 +466,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
             return (
               <div
                 key={index}
-                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0"
+                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0 max-h-[52px]"
               >
                 <div className={`relative h-full ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}>
 
