@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-heading: 'Fredoka', sans-serif;
+  --font-body: 'Nunito', sans-serif;
+
+  --color-clay-peach: #FDBCB4;
+  --color-clay-blue: #ADD8E6;
+  --color-clay-mint: #98FF98;
+  --color-clay-lilac: #E6E6FA;
+  --color-clay-yellow: #FFEAA7;
+  --color-clay-pink: #FF9ECD;
+  --color-clay-bg: #FFF8F0;
+  --color-clay-card: #FFFFFF;
+  --color-clay-border: #2D3436;
+  --color-clay-text: #2D3436;
+  --color-clay-muted: #636E72;
+  --color-clay-accent: #6C5CE7;
+  --color-clay-success: #00B894;
+  --color-clay-danger: #E17055;
+  --color-clay-track: #55A630;
+  --color-clay-dirt: #D4A373;
+  --color-clay-sky-top: #74B9FF;
+  --color-clay-sky-bottom: #DFE6E9;
+  --color-clay-gold: #FDCB6E;
+}
+
+/* ── Claymorphism Utility Shadows ── */
+
+.clay-shadow {
+  box-shadow:
+    inset -3px -3px 7px rgba(0, 0, 0, 0.08),
+    inset 3px 3px 7px rgba(255, 255, 255, 0.6),
+    5px 5px 0px rgba(0, 0, 0, 0.15);
+}
+
+.clay-shadow-lg {
+  box-shadow:
+    inset -4px -4px 10px rgba(0, 0, 0, 0.1),
+    inset 4px 4px 10px rgba(255, 255, 255, 0.7),
+    8px 8px 0px rgba(0, 0, 0, 0.12);
+}
+
+.clay-shadow-pressed {
+  box-shadow:
+    inset 3px 3px 7px rgba(0, 0, 0, 0.12),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.4),
+    2px 2px 0px rgba(0, 0, 0, 0.1);
+}
+
+.clay-shadow-inset {
+  box-shadow:
+    inset 4px 4px 10px rgba(0, 0, 0, 0.08),
+    inset -4px -4px 10px rgba(255, 255, 255, 0.5);
+}
+
+/* ── Animations ── */
+
+@keyframes dust-puff {
+  0% {
+    opacity: 0.7;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-16px, -8px) scale(0.2);
+  }
+}
+
+@keyframes winner-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+}
+
+@keyframes winner-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(253, 203, 110, 0.4), inset -3px -3px 7px rgba(0,0,0,0.08), inset 3px 3px 7px rgba(255,255,255,0.6); }
+  50% { box-shadow: 0 0 28px rgba(253, 203, 110, 0.9), inset -3px -3px 7px rgba(0,0,0,0.08), inset 3px 3px 7px rgba(255,255,255,0.6); }
+}
+
+@keyframes trophy-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(32px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes grass-sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.animate-dust { animation: dust-puff 0.5s ease-out forwards; }
+.animate-winner-bounce { animation: winner-bounce 0.6s ease-in-out infinite; }
+.animate-winner-glow { animation: winner-glow 1.5s ease-in-out infinite; }
+.animate-trophy-pulse { animation: trophy-pulse 2s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
+
+/* ── Reduced Motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dust,
+  .animate-winner-bounce,
+  .animate-winner-glow,
+  .animate-trophy-pulse,
+  .animate-slide-up {
+    animation: none !important;
+  }
+
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ── Base ── */
+
+body {
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  background: var(--color-clay-bg);
+}
+
+h1, h2, h3, h4, h5, h6, button {
+  font-family: var(--font-heading);
+}
+
+/* ── Focus Ring ── */
+
+:focus-visible {
+  outline: 3px solid var(--color-clay-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
