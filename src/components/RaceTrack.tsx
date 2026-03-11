@@ -455,7 +455,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </div>
 
         {/* Lanes */}
-        <div className="bg-[#4a8c3f] flex-1 flex flex-col min-h-0" ref={trackRef}>
+        <div
+          className="bg-[#4a8c3f] flex-1 flex flex-col min-h-0"
+          ref={trackRef}
+          style={{ maxHeight: `${participants.length * 52}px` }}
+        >
           {participants.map((name, index) => {
             const isWinner = raceFinished && raceState?.winnerId === index;
             const finishRank = raceFinished ? (raceState?.finishOrder.indexOf(index) ?? -1) : -1;
@@ -468,7 +472,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
             return (
               <div
                 key={index}
-                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0 max-h-[52px]"
+                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0"
               >
                 <div className={`relative h-full ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}>
                   {/* Grass mow stripes */}
