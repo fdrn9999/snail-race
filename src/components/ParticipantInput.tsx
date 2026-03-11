@@ -18,6 +18,11 @@ const SNAIL_TAG_COLORS = [
   "bg-clay-blue",
   "bg-clay-mint",
   "bg-clay-lilac",
+  "bg-clay-yellow",
+  "bg-clay-pink",
+  "bg-clay-peach",
+  "bg-clay-blue",
+  "bg-clay-mint",
 ];
 
 /** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 */
@@ -41,10 +46,10 @@ export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
 
   const { names, hasTruncated } = parseNames(text);
-  const validCount = Math.min(names.length, 10);
+  const validCount = Math.min(names.length, 15);
 
   function handleStart() {
-    const finalNames = names.slice(0, 10);
+    const finalNames = names.slice(0, 15);
     if (finalNames.length < 2) return;
     onStart(finalNames);
   }
@@ -68,7 +73,7 @@ export default function ParticipantInput({ onStart }: Props) {
             달팽이 레이싱
           </h1>
           <p className="font-body text-clay-muted text-sm mt-2">
-            참가자 이름을 입력하세요 (최대 10명, 8자 이내)
+            참가자 이름을 입력하세요 (최대 15명, 8자 이내)
           </p>
           <p className="font-body text-clay-muted/60 text-xs mt-1">
             줄바꿈 / 쉼표 / 탭으로 구분 가능
@@ -95,7 +100,7 @@ export default function ParticipantInput({ onStart }: Props) {
           />
           {/* Count indicator */}
           <span className="absolute bottom-3 right-3 text-xs font-body text-clay-muted/60">
-            {validCount}/10명
+            {validCount}/15명
           </span>
         </div>
 
@@ -106,7 +111,7 @@ export default function ParticipantInput({ onStart }: Props) {
             animate={{ opacity: 1 }}
             className="mt-4 flex flex-wrap gap-2"
           >
-            {names.slice(0, 10).map((name, i) => (
+            {names.slice(0, 15).map((name, i) => (
               <motion.span
                 key={`${i}-${name}`}
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -121,9 +126,9 @@ export default function ParticipantInput({ onStart }: Props) {
                 <span className="max-w-[100px] truncate">{name}</span>
               </motion.span>
             ))}
-            {names.length > 10 && (
+            {names.length > 15 && (
               <span className="text-clay-danger text-sm font-bold self-center font-body">
-                +{names.length - 10}명 초과
+                +{names.length - 15}명 초과
               </span>
             )}
           </motion.div>

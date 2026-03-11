@@ -13,6 +13,7 @@ interface Props {
 const SHELL_COLORS = [
   "#FF6B6B", "#4ECDC4", "#45B7D1", "#FDCB6E", "#A29BFE",
   "#FF9ECD", "#6C5CE7", "#E17055", "#00B894", "#74B9FF",
+  "#FD79A8", "#55E6C1", "#FDA7DF", "#F8C291", "#82CCDD",
 ];
 
 const RACE_DURATION = 10000;
@@ -47,7 +48,9 @@ function getLaneHeight(count: number, isDesktop: boolean): number {
   if (count <= 4) return isDesktop ? 76 : 60;
   if (count <= 6) return isDesktop ? 66 : 52;
   if (count <= 8) return isDesktop ? 58 : 46;
-  return isDesktop ? 52 : 42; // 9-10명
+  if (count <= 10) return isDesktop ? 52 : 42;
+  if (count <= 12) return isDesktop ? 46 : 38;
+  return isDesktop ? 42 : 34; // 13-15명
 }
 
 export default function RaceTrack({ participants, onReset }: Props) {
@@ -215,7 +218,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   // 레인 높이 (참가자 수에 따라 유동)
   const laneHeightMobile = getLaneHeight(participants.length, false);
   const laneHeightDesktop = getLaneHeight(participants.length, true);
-  const snailSize = participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
+  const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
