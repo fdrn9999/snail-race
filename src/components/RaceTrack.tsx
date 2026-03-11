@@ -435,11 +435,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Top rail */}
         <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
                         border-b-[3px] border-[#3E2723] relative overflow-hidden">
-          <div className="flex gap-6 sm:gap-10 absolute inset-x-0 top-0 h-full items-end px-2 pointer-events-none" aria-hidden="true">
-            {Array.from({ length: 14 }).map((_, i) => (
-              <div key={i} className="w-[6px] h-full bg-[#4E342E] rounded-t-sm shrink-0 opacity-40" />
-            ))}
-          </div>
           <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest z-10
                            bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15">
             Start
