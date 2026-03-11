@@ -21,18 +21,26 @@ const SNAIL_TAG_COLORS = [
 ];
 
 /** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 */
-function parseNames(text: string): string[] {
-  return text
+function parseNames(text: string): { names: string[]; hasTruncated: boolean } {
+  let hasTruncated = false;
+  const names = text
     .split(/[\n,\t]+/)
     .map((n) => n.trim())
     .filter(Boolean)
-    .map((n) => (n.length > 8 ? n.slice(0, 8) : n));
+    .map((n) => {
+      if (n.length > 8) {
+        hasTruncated = true;
+        return n.slice(0, 8);
+      }
+      return n;
+    });
+  return { names, hasTruncated };
 }
 
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
 
-  const names = parseNames(text);
+  const { names, hasTruncated } = parseNames(text);
   const validCount = Math.min(names.length, 10);
 
   function handleStart() {
@@ -80,7 +88,7 @@ export default function ParticipantInput({ onStart }: Props) {
             className="w-full h-32 sm:h-48 p-4 border-[3px] border-clay-border rounded-2xl text-base
                        font-body font-medium text-clay-text
                        focus:outline-none focus:ring-4 focus:ring-clay-accent/30 focus:border-clay-accent
-                       resize-none bg-clay-lilac/20 placeholder-clay-muted/40
+                       resize-none bg-clay-lilac/20 placeholder-clay-muted/70
                        clay-shadow-inset transition-colors duration-200"
             spellCheck={false}
             aria-label="참가자 이름을 줄바꿈, 쉼표, 탭으로 구분하여 입력"
@@ -162,11 +170,21 @@ export default function ParticipantInput({ onStart }: Props) {
           </button>
         </div>
 
-        {validCount > 0 && validCount < 2 && (
-          <p className="text-clay-danger text-sm mt-3 text-center font-body font-bold" role="alert">
-            최소 2명 이상 입력해주세요!
-          </p>
-        )}
+        {/* Feedback messages */}
+        <div className="mt-3 space-y-1 text-center">
+          {hasTruncated && (
+            <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
+              8자를 초과한 이름이 자동으로 잘렸습니다
+            </p>
+          )}
+          {validCount < 2 && (
+            <p className={`text-sm font-body font-bold ${validCount === 0 ? "text-clay-muted" : "text-clay-danger"}`}>
+              {validCount === 0
+                ? "최소 2명의 참가자를 입력해주세요"
+                : "1명 더 입력해주세요!"}
+            </p>
+          )}
+        </div>
       </div>
     </motion.div>
   );

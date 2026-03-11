@@ -46,8 +46,8 @@ function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number
 function getLaneHeight(count: number, isDesktop: boolean): number {
   if (count <= 4) return isDesktop ? 80 : 68;
   if (count <= 6) return isDesktop ? 72 : 62;
-  if (count <= 8) return isDesktop ? 64 : 54;
-  return isDesktop ? 56 : 48; // 9-10명
+  if (count <= 8) return isDesktop ? 64 : 56;
+  return isDesktop ? 56 : 52; // 9-10명 — 모바일 최소 52px 보장
 }
 
 export default function RaceTrack({ participants, onReset }: Props) {
@@ -254,8 +254,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
           </span>
         </div>
 
-        {/* Lanes area */}
-        <div className="bg-[#4a8c3f]" ref={trackRef}>
+        {/* Lanes area — scrollable on small screens with many participants */}
+        <div className="bg-[#4a8c3f] max-h-[65vh] overflow-y-auto" ref={trackRef}>
           {participants.map((name, index) => {
             const isWinner = showResult && raceState?.winnerId === index;
             const isEven = index % 2 === 0;
@@ -349,7 +349,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                         className="absolute right-full top-1/2 -translate-y-1/2 h-[6px] rounded-full pointer-events-none opacity-40"
                         style={{
                           width: `${Math.min((raceState?.positions[index] || 0) * 0.6, 40)}px`,
-                          background: "linear-gradient(90deg, transparent, #a8d97f)",
+                          background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45))",
                         }}
                       />
                     )}
@@ -392,7 +392,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                                          : "bg-white/95 text-clay-text"
                                        }`}
                       >
-                        <span className="max-w-[56px] sm:max-w-[80px] truncate inline-block">
+                        <span className="max-w-[72px] sm:max-w-[96px] truncate inline-block text-[9px] sm:text-[11px]">
                           {name}
                         </span>
                       </div>
@@ -406,6 +406,33 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         {/* Bottom rail */}
         <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
+
+        {/* Skip button — inside track, top-right */}
+        <AnimatePresence>
+          {isRacing && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ delay: 3, duration: 0.3 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleSkip}
+              className="absolute top-12 sm:top-14 right-2 sm:right-3 z-25
+                         py-1.5 px-3 bg-white/90 text-clay-muted font-heading font-bold
+                         rounded-xl text-xs border-2 border-clay-border/15
+                         shadow-md cursor-pointer backdrop-blur-sm
+                         hover:text-clay-text hover:bg-white transition-all duration-200"
+            >
+              <span className="flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="5 4 15 12 5 20 5 4" />
+                  <line x1="19" y1="5" x2="19" y2="19" />
+                </svg>
+                스킵
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         {/* Countdown overlay */}
         <AnimatePresence>
@@ -454,29 +481,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               레이스 시작!
-            </span>
-          </motion.button>
-        )}
-
-        {/* Skip button during race */}
-        {isRacing && (
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 3, duration: 0.3 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleSkip}
-            className="py-2.5 px-5 bg-clay-card text-clay-muted font-heading font-bold
-                       rounded-2xl text-sm border-[3px] border-clay-border/15
-                       clay-shadow cursor-pointer
-                       hover:text-clay-text hover:brightness-95 transition-all duration-200"
-          >
-            <span className="flex items-center gap-1.5">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polygon points="5 4 15 12 5 20 5 4" />
-                <line x1="19" y1="5" x2="19" y2="19" />
-              </svg>
-              결과 바로보기
             </span>
           </motion.button>
         )}
