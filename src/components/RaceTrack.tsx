@@ -462,6 +462,74 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </AnimatePresence>
       </div>
 
+      {/* ══════ Live Finish Feed ══════ */}
+      <AnimatePresence>
+        {!showResult && raceState && raceState.finishOrder.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="mt-4 max-w-md mx-auto"
+          >
+            <div className="bg-clay-card/90 backdrop-blur-sm rounded-2xl p-3 sm:p-4 border-[3px] border-clay-border/40 clay-shadow">
+              <p className="font-heading text-xs text-clay-muted font-bold mb-2 uppercase tracking-wider">
+                도착 현황
+              </p>
+              <div className="space-y-1.5">
+                {raceState.finishOrder.map((participantIdx, rank) => {
+                  const name = participants[participantIdx];
+                  const medal = rank === 0 ? "🥇" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : null;
+                  const isFirst = rank === 0;
+
+                  return (
+                    <motion.div
+                      key={`live-${participantIdx}`}
+                      initial={{ opacity: 0, x: -30, scale: 0.9 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      transition={{ type: "spring", damping: 20, stiffness: 300 }}
+                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border-2
+                        ${isFirst
+                          ? "bg-clay-gold/25 border-clay-gold/60"
+                          : "bg-white/50 border-transparent"
+                        }`}
+                    >
+                      <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                                        font-heading font-bold text-xs border-2
+                        ${isFirst
+                          ? "bg-clay-gold border-clay-border/20 text-clay-border"
+                          : rank <= 2
+                            ? "bg-white border-clay-border/15 text-clay-text"
+                            : "bg-clay-bg border-clay-border/10 text-clay-muted"
+                        }`}>
+                        {medal || `${rank + 1}`}
+                      </span>
+                      <SnailSvg
+                        shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
+                        size={22}
+                      />
+                      <span className={`font-heading font-bold truncate text-sm
+                        ${isFirst ? "text-clay-text" : "text-clay-text/75"}`}>
+                        {name}
+                      </span>
+                      <motion.span
+                        initial={{ scale: 1.4, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.1, type: "spring", damping: 15 }}
+                        className={`ml-auto shrink-0 font-heading text-xs font-bold
+                          ${isFirst ? "text-[#E17055]" : "text-clay-muted/70"}`}
+                      >
+                        {rank + 1}등!
+                      </motion.span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Controls */}
       <div className="flex justify-center gap-3 mt-6">
         {!isRacing && !raceState && countdown === null && (
