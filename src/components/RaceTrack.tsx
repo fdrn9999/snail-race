@@ -291,14 +291,114 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </div>
       )}
 
-      {/* Header */}
-      <div className="text-center mb-5">
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold text-clay-text tracking-tight">
-          달팽이 레이싱
-        </h1>
-        <p className="font-body text-clay-muted text-sm mt-1">
-          {participants.length}명 참가
-        </p>
+      {/* Header + Ranking Panel */}
+      <div className="mb-4">
+        {/* Title row */}
+        <div className="text-center mb-3">
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold text-clay-text tracking-tight">
+            달팽이 레이싱
+          </h1>
+          <p className="font-body text-clay-muted text-sm mt-1">
+            {participants.length}명 참가
+          </p>
+        </div>
+
+        {/* ═══ Ranking Panel (header area, always visible during race) ═══ */}
+        <AnimatePresence>
+          {(isRacing || raceFinished) && raceState && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div className="bg-clay-card rounded-3xl border-[3px] border-clay-border clay-shadow-lg
+                              px-4 sm:px-5 py-3 sm:py-3.5">
+
+                {/* Label */}
+                <div className="text-center mb-2">
+                  <span className={`font-heading font-bold text-[11px] sm:text-xs tracking-wide uppercase
+                    ${raceFinished ? "text-clay-text" : "text-clay-muted"}`}>
+                    {raceFinished ? "최종 순위" : "실시간 순위"}
+                  </span>
+                </div>
+
+                {/* ── Top 3 — horizontal, prominent ── */}
+                <div className="flex gap-2 justify-center">
+                  {liveRankings.slice(0, 3).map((participantIdx, rank) => {
+                    const isConfirmed = rank < finishOrder.length;
+                    const medal = isConfirmed
+                      ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
+                      : null;
+                    const isFirst = rank === 0;
+
+                    return (
+                      <motion.div
+                        key={`top-${participantIdx}`}
+                        layout
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.25 }}
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border-2
+                          ${isConfirmed
+                            ? isFirst
+                              ? "bg-clay-gold/30 border-clay-gold"
+                              : rank === 1
+                                ? "bg-clay-lilac/25 border-clay-lilac/60"
+                                : "bg-clay-peach/20 border-clay-peach/50"
+                            : "bg-clay-bg/50 border-clay-border/10"
+                          }`}
+                      >
+                        <span className={`shrink-0 font-heading font-bold
+                          ${isFirst ? "text-sm sm:text-base" : "text-xs sm:text-sm"}
+                          ${isConfirmed ? "" : "text-clay-muted/50"}`}>
+                          {medal || `${rank + 1}`}
+                        </span>
+                        <SnailSvg
+                          shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
+                          size={isFirst ? 24 : 20}
+                        />
+                        <span className={`font-heading font-bold truncate max-w-[56px] sm:max-w-[72px]
+                          ${isConfirmed
+                            ? isFirst
+                              ? "text-xs sm:text-sm text-clay-text"
+                              : "text-[11px] sm:text-xs text-clay-text/85"
+                            : "text-[11px] sm:text-xs text-clay-muted/50"
+                          }`}>
+                          {participants[participantIdx]}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                {/* ── 4th+ — compact row ── */}
+                {liveRankings.length > 3 && (
+                  <div className="mt-2 pt-1.5 border-t-2 border-clay-border/8">
+                    <div className="flex flex-wrap justify-center gap-x-1 gap-y-px">
+                      {liveRankings.slice(3).map((participantIdx, i) => {
+                        const globalRank = i + 3;
+                        const isConfirmed = globalRank < finishOrder.length;
+                        return (
+                          <span
+                            key={`rest-${participantIdx}`}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5
+                                       text-[9px] sm:text-[10px] font-body font-semibold
+                                       ${isConfirmed ? "text-clay-muted/65" : "text-clay-muted/35"}`}
+                          >
+                            <span className={isConfirmed ? "text-clay-muted/45" : "text-clay-muted/25"}>{i + 4}</span>
+                            <span className="truncate max-w-[48px] sm:max-w-[60px]">{participants[participantIdx]}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ══════ Race Track ══════ */}
@@ -467,102 +567,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
         {/* Bottom rail */}
         <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
 
-        {/* ═══ Ranking Panel (center overlay, always visible during race) ═══ */}
-        <AnimatePresence>
-          {(isRacing || raceFinished) && raceState && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", damping: 22, stiffness: 280 }}
-              className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-            >
-              <div className="bg-clay-card/80 backdrop-blur-md rounded-3xl border-[3px] border-clay-border
-                              clay-shadow-lg pointer-events-auto
-                              px-4 sm:px-6 py-3 sm:py-4 w-[200px] sm:w-[260px]">
-
-                {/* Header */}
-                <div className="text-center mb-2">
-                  <span className={`font-heading font-bold text-xs sm:text-sm text-clay-text
-                    ${raceFinished ? "" : "opacity-70"}`}>
-                    {raceFinished ? "최종 순위" : "실시간 순위"}
-                  </span>
-                </div>
-
-                {/* ── Top 3 — prominent ── */}
-                <div className="space-y-1.5">
-                  {liveRankings.slice(0, 3).map((participantIdx, rank) => {
-                    const isConfirmed = rank < finishOrder.length;
-                    const medal = isConfirmed
-                      ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
-                      : null;
-                    const isFirst = rank === 0;
-
-                    return (
-                      <motion.div
-                        key={`top-${participantIdx}`}
-                        initial={{ opacity: 0, x: -16 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border-2
-                          ${isConfirmed
-                            ? isFirst
-                              ? "bg-clay-gold/35 border-clay-gold"
-                              : rank === 1
-                                ? "bg-clay-lilac/25 border-clay-lilac/60"
-                                : "bg-clay-peach/20 border-clay-peach/50"
-                            : "bg-white/20 border-clay-border/10"
-                          }`}
-                      >
-                        <span className={`shrink-0 font-heading font-bold
-                          ${isFirst ? "text-base sm:text-lg" : "text-sm sm:text-base"}
-                          ${isConfirmed ? "" : "text-clay-muted/60"}`}>
-                          {medal || `${rank + 1}`}
-                        </span>
-                        <SnailSvg
-                          shellColor={SHELL_COLORS[participantIdx % SHELL_COLORS.length]}
-                          size={isFirst ? 28 : 22}
-                        />
-                        <span className={`font-heading font-bold truncate
-                          ${isConfirmed
-                            ? isFirst
-                              ? "text-sm sm:text-base text-clay-text"
-                              : "text-xs sm:text-sm text-clay-text/85"
-                            : "text-xs sm:text-sm text-clay-muted/60"
-                          }`}>
-                          {participants[participantIdx]}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-
-                {/* ── 4th+ — compact, muted ── */}
-                {liveRankings.length > 3 && (
-                  <div className="mt-2 pt-2 border-t-2 border-clay-border/8">
-                    <div className="flex flex-wrap gap-x-1 gap-y-px">
-                      {liveRankings.slice(3).map((participantIdx, i) => {
-                        const rank = i + 3;
-                        const isConfirmed = rank < finishOrder.length;
-                        return (
-                          <span
-                            key={`rest-${participantIdx}`}
-                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5
-                                       text-[9px] sm:text-[10px] font-body font-semibold
-                                       ${isConfirmed ? "text-clay-muted/70" : "text-clay-muted/40"}`}
-                          >
-                            <span className={isConfirmed ? "text-clay-muted/50" : "text-clay-muted/30"}>{i + 4}</span>
-                            <span className="truncate max-w-[52px] sm:max-w-[64px]">{participants[participantIdx]}</span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Skip button (left side) */}
         <AnimatePresence>
