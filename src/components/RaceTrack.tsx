@@ -16,7 +16,7 @@ const SHELL_COLORS = [
   "#FD79A8", "#55E6C1", "#FDA7DF", "#F8C291", "#82CCDD",
 ];
 
-const RACE_DURATION = 10000;
+const RACE_DURATION = 30000;
 
 /* ── SVG Snail (cartoon) ── */
 function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number }) {
