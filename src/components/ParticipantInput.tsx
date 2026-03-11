@@ -58,8 +58,10 @@ export default function ParticipantInput({ onStart }: Props) {
   }
 
   function handleShuffle() {
+    // 원래 구분자를 감지하여 유지
+    const delimiter = text.includes(",") ? ", " : text.includes("\t") ? "\t" : "\n";
     const shuffled = [...names].sort(() => Math.random() - 0.5);
-    setText(shuffled.join("\n"));
+    setText(shuffled.join(delimiter));
   }
 
   function handleClear() {

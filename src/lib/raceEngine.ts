@@ -17,20 +17,21 @@ const REF_DT = 16.67;
 
 export function createRaceEngine(config: RaceConfig) {
   const { totalDuration, participantCount, predeterminedWinner } = config;
-  const finalPhaseStart = totalDuration - 2000;
+  const finalPhaseStart = totalDuration - 2500;
 
-  // 각 달팽이의 고유 특성 — 생성 시 확정
+  // ── 각 달팽이의 고유 특성 ──
+  // 모든 달팽이가 비슷한 속도, 사인파로 자연스러운 엎치락뒤치락
   const snails = Array.from({ length: participantCount }, (_, i) => {
     const isWinner = i === predeterminedWinner;
     return {
-      baseSpeed: 0.3 + Math.random() * 0.4,
-      variance: 0.2 + Math.random() * 0.3,
-      burstChance: 0.02 + Math.random() * 0.03,
-      // 개인 페이스: 레이스 진행도 대비 어디까지 갈지 결정
-      // 우승자는 항상 빠른 축, 나머지는 넓게 분산
+      // 기본 순항 속도: 모두 거의 같게
       cruiseRate: isWinner
-        ? 0.88 + Math.random() * 0.08 // 0.88–0.96
-        : 0.45 + Math.random() * 0.45, // 0.45–0.90 (넓은 분산)
+        ? 0.93 + Math.random() * 0.03 // 0.93–0.96
+        : 0.88 + Math.random() * 0.07, // 0.88–0.95 (우승자와 겹침)
+      // 사인파 — 진폭을 작게 유지 (±10% 이내 변동)
+      wave1: { freq: 0.3 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.04 },
+      wave2: { freq: 0.7 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2, amp: 0.02 + Math.random() * 0.03 },
+      wave3: { freq: 1.2 + Math.random() * 1.5, phase: Math.random() * Math.PI * 2, amp: 0.01 + Math.random() * 0.02 },
     };
   });
 
@@ -38,8 +39,9 @@ export function createRaceEngine(config: RaceConfig) {
   const finishOrder: number[] = [];
   const finishedSet = new Set<number>();
   let lastTimestamp = 0;
+  // 러버밴드용 보정 진행도 — dt 캡과 동기화
+  let smoothProgress = 0;
 
-  // 재사용 가능한 내부 상태 객체 (GC 부담 최소화)
   const _state: RaceState = {
     positions,
     finished: false,
@@ -49,29 +51,26 @@ export function createRaceEngine(config: RaceConfig) {
   };
   const frameFinishers: { index: number; overshoot: number }[] = [];
 
-  function dtScale(dt: number): number {
-    return dt / REF_DT;
-  }
-
-  /**
-   * 매 프레임 호출. 내부 배열을 직접 참조하는 객체를 반환합니다.
-   * React 상태에 넘길 때만 snapshot()을 사용하세요.
-   */
   function update(elapsed: number): RaceState {
-    const dt = elapsed - lastTimestamp;
+    const rawDt = elapsed - lastTimestamp;
     lastTimestamp = elapsed;
 
     _state.elapsedTime = elapsed;
     _state.finished = false;
 
+    // dt 상한: 탭 전환 등으로 큰 점프 방지 (최대 50ms ≈ 20fps)
+    const dt = Math.min(rawDt, 50);
+
     if (dt <= 0 || elapsed <= 0) {
       return _state;
     }
 
-    const progress = elapsed / totalDuration;
+    // smoothProgress: dt 캡에 맞춰 진행도도 점진적으로 증가 (탭 전환 시 점프 방지)
+    smoothProgress = Math.min(smoothProgress + dt / totalDuration, 1);
+    const timeSec = elapsed / 1000;
     const inFinalPhase = elapsed >= finalPhaseStart;
     const winnerFinished = finishedSet.has(predeterminedWinner);
-    const scale = dtScale(dt);
+    const scale = dt / REF_DT;
 
     frameFinishers.length = 0;
 
@@ -81,61 +80,68 @@ export function createRaceEngine(config: RaceConfig) {
       const snail = snails[i];
       const isWinner = i === predeterminedWinner;
 
-      // ── 기본 속도 계산 ──
-      let speed = snail.baseSpeed;
-      speed += (Math.random() - 0.5) * snail.variance * 2;
+      // ── 사인파 조합: 부드러운 속도 변화 (±10% 이내) ──
+      const w1 = Math.sin(timeSec * snail.wave1.freq + snail.wave1.phase) * snail.wave1.amp;
+      const w2 = Math.sin(timeSec * snail.wave2.freq + snail.wave2.phase) * snail.wave2.amp;
+      const w3 = Math.sin(timeSec * snail.wave3.freq + snail.wave3.phase) * snail.wave3.amp;
 
-      if (Math.random() < 1 - Math.pow(1 - snail.burstChance, scale)) {
-        speed *= 1.5 + Math.random();
-      }
-      if (Math.random() < 1 - Math.pow(1 - 0.05, scale)) {
-        speed *= 0.3;
-      }
+      // 속도 배율: 0.9 ~ 1.1 범위로 제한 (부스터/급정지 없음)
+      const speedMul = Math.max(0.9, Math.min(1.1, 1.0 + w1 + w2 + w3));
 
-      let movement = speed * (dt / totalDuration) * 100;
+      // 기본 이동량
+      const baseMovement = snail.cruiseRate * (dt / totalDuration) * 100;
+      let movement = baseMovement * speedMul;
 
       if (winnerFinished) {
-        // ── 우승자 통과 후: 나머지 달팽이들 자유 가속 ──
-        const orderBias = 0.8 + Math.random() * 0.8;
-        positions[i] += movement * 1.5 * orderBias;
+        // 우승자 통과 후: 나머지 자유 전진
+        positions[i] += movement * 1.2;
       } else {
-        // ── 소프트 페이싱: 개인 목표 위치 기반 러버밴드 ──
-        const expectedPos = snail.cruiseRate * progress * 100;
+        // ── 소프트 페이싱: smoothProgress 기반 러버밴드 ──
+        const expectedPos = snail.cruiseRate * smoothProgress * 100;
         const deviation = positions[i] - expectedPos;
 
-        if (deviation > 6) {
-          movement *= Math.max(0.05, 1 - (deviation - 6) / 20);
-        } else if (deviation < -8) {
-          movement *= 1.15 + Math.random() * 0.15;
+        if (deviation > 4) {
+          // 앞서면 살짝 감속 (급정지 없이)
+          const dampFactor = Math.max(0.5, 1 - (deviation - 4) / 30);
+          movement *= dampFactor;
+        } else if (deviation < -4) {
+          // 뒤처지면 살짝 가속 (부스터 없이)
+          movement *= Math.min(1.12, 1 + (-deviation - 4) / 40);
         }
 
         positions[i] += movement;
 
-        // ── 우승자 최종 스퍼트 (마지막 2초) ──
+        // ── 우승자 최종 구간 (마지막 2.5초) ──
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
-          const winTarget = 82 + finalProgress * 18;
+          // easeIn 커브: 처음엔 미미하다가 끝에 살짝 앞섬
+          const eased = finalProgress * finalProgress;
+          const winTarget = 76 + eased * 24;
           const gap = winTarget - positions[i];
           if (gap > 0) {
-            const convergence = 1 - Math.pow(1 - 0.12, scale);
+            // 작은 convergence → 한 프레임에 최대 gap*0.05 이동
+            const convergence = 1 - Math.pow(1 - 0.05, scale);
             positions[i] += gap * convergence;
           }
         }
 
-        // ── 패배자: 마지막 국면에서 우승자 추월 방지 ──
+        // ── 패배자: 우승자 추월 시 미세 감속 (뒤로 가지는 않음) ──
         if (!isWinner && inFinalPhase) {
           const winnerPos = positions[predeterminedWinner];
-          if (positions[i] > winnerPos - 2) {
-            const tooClose = positions[i] - (winnerPos - 2);
-            const brake = Math.max(0.02, 1 - tooClose / 8);
-            positions[i] -= movement * (1 - brake);
+          if (positions[i] > winnerPos + 0.5) {
+            movement *= 0.85;
           }
         }
 
-        // ── 우승자 최소 보장: 너무 뒤처지지 않도록 ──
-        if (isWinner && positions[i] < progress * 45) {
-          positions[i] = progress * 45 + Math.random() * 8;
+        // ── 우승자 최소 보장: 위치를 덮어쓰지 않고 부드럽게 당김 ──
+        if (isWinner) {
+          const minPos = smoothProgress * 50;
+          if (positions[i] < minPos) {
+            const pullGap = minPos - positions[i];
+            const pull = 1 - Math.pow(1 - 0.04, scale);
+            positions[i] += pullGap * pull;
+          }
         }
       }
 
@@ -179,6 +185,7 @@ export function createRaceEngine(config: RaceConfig) {
     finishOrder.length = 0;
     finishedSet.clear();
     lastTimestamp = 0;
+    smoothProgress = 0;
   }
 
   return { update, snapshot, reset };

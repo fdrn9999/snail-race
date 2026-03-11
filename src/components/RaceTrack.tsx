@@ -58,7 +58,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const [isRacing, setIsRacing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showGo, setShowGo] = useState(false);
-  const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(false);
+  const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("snailrace-landscape-dismissed") === "1";
+    }
+    return false;
+  });
   const engineRef = useRef<ReturnType<typeof createRaceEngine> | null>(null);
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -211,7 +216,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
           frameCountRef.current++;
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
-          if (finishChanged || frameCountRef.current % 5 === 0 || state.finished) {
+          if (finishChanged || frameCountRef.current % 3 === 0 || state.finished) {
             prevFinishCountRef.current = state.finishOrder.length;
             setRaceState(engine.snapshot());
           }
@@ -278,7 +283,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
             </p>
             <button
               type="button"
-              onClick={() => setLandscapeHintDismissed(true)}
+              onClick={() => {
+                setLandscapeHintDismissed(true);
+                localStorage.setItem("snailrace-landscape-dismissed", "1");
+              }}
               className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full
                          text-clay-muted hover:text-clay-text transition-colors cursor-pointer"
               aria-label="가로 모드 안내 닫기"
@@ -385,9 +393,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
                             key={`rest-${participantIdx}`}
                             className={`inline-flex items-center gap-0.5 px-1.5 py-0.5
                                        text-[9px] sm:text-[10px] font-body font-semibold
-                                       ${isConfirmed ? "text-clay-muted/65" : "text-clay-muted/35"}`}
+                                       ${isConfirmed ? "text-clay-muted" : "text-clay-muted/50"}`}
                           >
-                            <span className={isConfirmed ? "text-clay-muted/45" : "text-clay-muted/25"}>{i + 4}</span>
+                            <span className={isConfirmed ? "text-clay-muted/70" : "text-clay-muted/40"}>{i + 4}</span>
                             <span className="truncate max-w-[48px] sm:max-w-[60px]">{participants[participantIdx]}</span>
                           </span>
                         );
