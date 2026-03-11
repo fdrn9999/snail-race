@@ -43,15 +43,6 @@ function SnailSvg({ shellColor, size = 40 }: { shellColor: string; size?: number
   );
 }
 
-/** 참가자 수에 따라 레인 높이 계산 (px) — mobile / desktop */
-function getLaneHeights(count: number): [number, number] {
-  if (count <= 4) return [60, 76];
-  if (count <= 6) return [52, 66];
-  if (count <= 8) return [46, 58];
-  if (count <= 10) return [42, 52];
-  if (count <= 12) return [38, 46];
-  return [34, 42]; // 13-15명
-}
 
 export default function RaceTrack({ participants, onReset }: Props) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
@@ -76,8 +67,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const frameCountRef = useRef(0);
   const prevFinishCountRef = useRef(0);
 
-  // CSS-only 반응형 레인 높이 (Layout Shift 방지)
-  const [laneHeightMobile, laneHeightDesktop] = getLaneHeights(participants.length);
   const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
 
   const cleanup = useCallback(() => {
@@ -285,13 +274,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
-      {/* CSS-only 반응형 레인 높이 (hydration-safe) */}
-      <style>{`.race-lane{height:${laneHeightMobile}px}@media(min-width:640px){.race-lane{height:${laneHeightDesktop}px}}`}</style>
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-3 h-dvh flex flex-col">
 
       {/* Mobile landscape hint (portrait + many participants) */}
       {participants.length >= 8 && !landscapeHintDismissed && (
-        <div className="sm:hidden mb-3">
+        <div className="sm:hidden mb-1 shrink-0">
           <div className="flex items-center gap-2 px-3 py-2 bg-clay-gold/30 rounded-xl border-2 border-clay-gold/50">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-clay-border shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="2" y="7" width="20" height="10" rx="2" />
@@ -319,7 +306,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       )}
 
       {/* Header — 레이스 중에는 축소하여 공간 절약 */}
-      <div className="mb-2 sm:mb-3">
+      <div className="shrink-0 mb-1 sm:mb-2">
         {/* 풀 타이틀: 레이스 전/후에만 표시 */}
         {!isRacing && countdown === null && !raceFinished && (
           <div className="text-center mb-3">
@@ -356,7 +343,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                             px-2 sm:px-3 py-1.5">
               {raceState ? (
                 <LayoutGroup>
-                  <div className="flex items-center justify-center gap-x-1 sm:gap-x-1.5 flex-wrap gap-y-0.5">
+                  <div className="flex items-center justify-center gap-x-1 sm:gap-x-1.5 flex-nowrap overflow-x-auto">
                     {liveRankings.map((participantIdx, rank) => {
                       const isConfirmed = rank < finishOrder.length;
                       const isTop3 = rank < 3;
@@ -415,10 +402,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
       </div>
 
       {/* ══════ Race Track ══════ */}
-      <div className="relative rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden">
+      <div className="flex-1 min-h-0 relative rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden flex flex-col">
 
         {/* Top rail — dark wood fence */}
-        <div className="h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
+        <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
                         border-b-[3px] border-[#3E2723]">
           <div className="flex gap-6 sm:gap-10 absolute inset-x-0 top-0 h-full items-end px-2 pointer-events-none" aria-hidden="true">
             {Array.from({ length: 14 }).map((_, i) => (
@@ -440,7 +427,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </div>
 
         {/* Lanes area */}
-        <div className="bg-[#4a8c3f]" ref={trackRef}>
+        <div className="bg-[#4a8c3f] flex-1 flex flex-col min-h-0" ref={trackRef}>
           {participants.map((name, index) => {
             const isWinner = raceFinished && raceState?.winnerId === index;
             const isEven = index % 2 === 0;
@@ -448,10 +435,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
             return (
               <div
                 key={index}
-                className="relative border-b-[2px] border-[#3d7233] last:border-b-0"
+                className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0"
               >
                 <div
-                  className={`race-lane relative ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}
+                  className={`relative h-full ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}
                 >
                   {/* Grass mow stripes */}
                   <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
@@ -586,7 +573,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         </div>
 
         {/* Bottom rail */}
-        <div className="h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
+        <div className="shrink-0 h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
 
 
         {/* Skip button (left side) */}
@@ -670,7 +657,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       </div>
 
       {/* Controls */}
-      <div className="flex justify-center gap-3 mt-6">
+      <div className="shrink-0 flex justify-center gap-3 mt-2 sm:mt-3">
         {!isRacing && !raceState && countdown === null && (
           <motion.button
             initial={{ scale: 0.8, opacity: 0 }}
