@@ -34,6 +34,13 @@ export function createRaceEngine(config: RaceConfig) {
       wave1: { freq: 0.3 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.04 },
       wave2: { freq: 0.7 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2, amp: 0.02 + Math.random() * 0.03 },
       wave3: { freq: 1.2 + Math.random() * 1.5, phase: Math.random() * Math.PI * 2, amp: 0.01 + Math.random() * 0.02 },
+      // 극적 역전 서지: 비우승자에게 중반에 간헐적 가속을 부여하는 저주파 파형
+      surge: isWinner ? null : {
+        freq: 0.15 + Math.random() * 0.1,       // 매우 느린 주기 (~7-10초)
+        phase: Math.random() * Math.PI * 2,
+        amp: 0.06 + Math.random() * 0.04,        // 최대 ±10% 추가
+        activeRange: [0.25 + Math.random() * 0.1, 0.65 + Math.random() * 0.1] as [number, number],
+      },
     };
   });
 
@@ -89,7 +96,19 @@ export function createRaceEngine(config: RaceConfig) {
       const w2 = Math.sin(timeSec * snail.wave2.freq + snail.wave2.phase) * snail.wave2.amp;
       const w3 = Math.sin(timeSec * snail.wave3.freq + snail.wave3.phase) * snail.wave3.amp;
 
-      const speedMul = Math.max(0.9, Math.min(1.1, 1.0 + w1 + w2 + w3));
+      // 극적 역전 서지 적용 (중반 구간에서만 활성)
+      let surgeBonus = 0;
+      if (snail.surge) {
+        const progress = smoothProgress;
+        const [lo, hi] = snail.surge.activeRange;
+        if (progress >= lo && progress <= hi) {
+          const surgeWindow = (progress - lo) / (hi - lo);
+          const envelope = Math.sin(surgeWindow * Math.PI); // 0→1→0 부드러운 활성 곡선
+          surgeBonus = Math.sin(timeSec * snail.surge.freq + snail.surge.phase) * snail.surge.amp * envelope;
+        }
+      }
+
+      const speedMul = Math.max(0.9, Math.min(1.15, 1.0 + w1 + w2 + w3 + surgeBonus));
 
       const baseMovement = snail.cruiseRate * (dt / totalDuration) * 100;
       let movement = baseMovement * speedMul;

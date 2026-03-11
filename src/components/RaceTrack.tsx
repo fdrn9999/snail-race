@@ -64,6 +64,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const snailRefs = useRef<(HTMLDivElement | null)[]>([]);
   const slimeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const dustRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sweatRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const confettiFrameRef = useRef<number>(0);
   const frameCountRef = useRef(0);
   const prevFinishCountRef = useRef(0);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
@@ -137,11 +139,17 @@ export default function RaceTrack({ participants, onReset }: Props) {
     });
   }, [isRacing]);
 
+  const stopConfetti = useCallback(() => {
+    cancelAnimationFrame(confettiFrameRef.current);
+    confetti.reset();
+  }, []);
+
   const cleanup = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     if (countIntervalRef.current) clearInterval(countIntervalRef.current);
     stopBgm();
-  }, [stopBgm]);
+    stopConfetti();
+  }, [stopBgm, stopConfetti]);
 
   const fireConfetti = useCallback(() => {
     const end = Date.now() + 3500;
@@ -160,12 +168,14 @@ export default function RaceTrack({ participants, onReset }: Props) {
         origin: { x: 1, y: 0.65 },
         colors: ["#FDCB6E", "#FF6B6B", "#4ECDC4", "#A29BFE", "#FF9ECD"],
       });
-      if (Date.now() < end) requestAnimationFrame(frame);
+      if (Date.now() < end) {
+        confettiFrameRef.current = requestAnimationFrame(frame);
+      }
     };
-    frame();
+    confettiFrameRef.current = requestAnimationFrame(frame);
   }, []);
 
-  const updateEffects = useCallback((positions: number[]) => {
+  const updateEffects = useCallback((positions: number[], leadPos: number) => {
     for (let i = 0; i < positions.length; i++) {
       const pos = positions[i];
       const slimeEl = slimeRefs.current[i];
@@ -180,6 +190,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
       const dustEl = dustRefs.current[i];
       if (dustEl) {
         dustEl.style.display = pos > 3 ? "block" : "none";
+      }
+      // 꼴찌 근처 달팽이에게 땀방울 표시 (선두와 15% 이상 차이)
+      const sweatEl = sweatRefs.current[i];
+      if (sweatEl) {
+        const gap = leadPos - pos;
+        sweatEl.style.display = gap > 15 && pos > 5 ? "block" : "none";
       }
     }
   }, []);
@@ -211,6 +227,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
       if (slimeEl) slimeEl.style.display = "none";
       const dustEl = dustRefs.current[i];
       if (dustEl) dustEl.style.display = "none";
+      const sweatEl = sweatRefs.current[i];
+      if (sweatEl) sweatEl.style.display = "none";
     }
 
     setRaceState(engine.snapshot());
@@ -236,6 +254,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     snailRefs.current = new Array(participants.length).fill(null);
     slimeRefs.current = new Array(participants.length).fill(null);
     dustRefs.current = new Array(participants.length).fill(null);
+    sweatRefs.current = new Array(participants.length).fill(null);
     frameCountRef.current = 0;
     prevFinishCountRef.current = 0;
     setRaceState(null);
@@ -291,7 +310,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
             }
           }
 
-          updateEffects(state.positions);
+          const leadPos = Math.max(...state.positions);
+          updateEffects(state.positions, leadPos);
 
           frameCountRef.current++;
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
@@ -317,6 +337,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
               if (slimeEl) slimeEl.style.display = "none";
               const dustEl = dustRefs.current[i];
               if (dustEl) dustEl.style.display = "none";
+              const sweatEl = sweatRefs.current[i];
+              if (sweatEl) sweatEl.style.display = "none";
             }
             setTimeout(() => fireConfetti(), 400);
           }
@@ -328,14 +350,41 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
   useEffect(() => cleanup, [cleanup]);
 
+  // BGM 탭 전환 싱크: 탭이 숨겨지면 일시정지, 돌아오면 재개
+  useEffect(() => {
+    const handleVisibility = () => {
+      const audio = bgmRef.current;
+      if (!audio) return;
+      if (document.hidden) {
+        if (!audio.paused) audio.pause();
+      } else {
+        if (isRacing && !bgmMuted && audio.paused && audio.currentTime > 0) {
+          audio.play().catch(() => {});
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [isRacing, bgmMuted]);
+
+  const pendingReraceRef = useRef(false);
+
   const handleRerace = () => {
     cleanup();
     setRaceState(null);
     setIsRacing(false);
     setCountdown(null);
     setShowGo(false);
-    setTimeout(() => startRace(), 80);
+    pendingReraceRef.current = true;
   };
+
+  // 상태 초기화 완료 후 새 레이스 시작 (80ms 매직넘버 제거)
+  useEffect(() => {
+    if (pendingReraceRef.current && raceState === null && !isRacing && countdown === null) {
+      pendingReraceRef.current = false;
+      startRace();
+    }
+  }, [raceState, isRacing, countdown, startRace]);
 
   const finishOrder = raceState?.finishOrder || [];
   const raceFinished = !!raceState?.finished;
@@ -550,6 +599,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
         <div className="bg-[#4a8c3f] flex-1 flex flex-col min-h-0" ref={trackRef}>
           {participants.map((name, index) => {
             const isWinner = raceFinished && raceState?.winnerId === index;
+            const finishRank = raceFinished ? (raceState?.finishOrder.indexOf(index) ?? -1) : -1;
+            const is2nd = raceFinished && finishRank === 1;
+            const is3rd = raceFinished && finishRank === 2;
             const isEven = index % 2 === 0;
 
             return (
@@ -656,8 +708,38 @@ export default function RaceTrack({ participants, onReset }: Props) {
                       ))}
                     </div>
 
+                    {/* 땀방울 이펙트 (꼴찌 근처) */}
+                    <div
+                      ref={(el) => { sweatRefs.current[index] = el; }}
+                      className="absolute -top-1 right-0 pointer-events-none"
+                      style={{ display: "none" }}
+                    >
+                      {[0, 1].map((d) => (
+                        <span
+                          key={d}
+                          className="absolute animate-sweat"
+                          style={{
+                            animationDelay: `${d * 0.35}s`,
+                            animationIterationCount: "infinite",
+                            left: `${d * 8}px`,
+                            top: `${d * 2}px`,
+                            width: "4px",
+                            height: "6px",
+                            borderRadius: "50% 50% 50% 50% / 30% 30% 70% 70%",
+                            backgroundColor: "#74B9FF",
+                            opacity: 0.7,
+                          }}
+                        />
+                      ))}
+                    </div>
+
                     <div className={`relative flex items-center ${isWinner ? "animate-winner-bounce" : ""}`}>
-                      <div className={`relative ${isWinner ? "animate-winner-glow rounded-2xl" : ""} ${isRacing ? "animate-snail-crawl" : ""}`}>
+                      <div className={`relative ${
+                        isWinner ? "animate-winner-glow rounded-2xl"
+                        : is2nd ? "animate-silver-glow rounded-2xl"
+                        : is3rd ? "animate-bronze-glow rounded-2xl"
+                        : ""
+                      } ${isRacing ? "animate-snail-crawl" : ""}`}>
                         <SnailSvg
                           shellColor={SHELL_COLORS[index % SHELL_COLORS.length]}
                           size={snailSize}
@@ -666,19 +748,26 @@ export default function RaceTrack({ participants, onReset }: Props) {
                       <div className={`absolute whitespace-nowrap
                                        px-2 py-0.5 rounded-lg
                                        font-heading font-bold
-                                       border-[2px] border-clay-border/30 shadow-sm
+                                       border-[2px] shadow-sm
                                        ${isWinner
-                                         ? "bg-clay-gold text-clay-border"
-                                         : "bg-white/95 text-clay-text"
+                                         ? "bg-clay-gold text-clay-border border-clay-gold/60"
+                                         : is2nd
+                                           ? "bg-gray-200 text-clay-border border-gray-300/60"
+                                           : is3rd
+                                             ? "bg-orange-200 text-clay-border border-orange-300/60"
+                                             : "bg-white/95 text-clay-text border-clay-border/30"
                                        }
                                        ${participants.length >= 11
                                          ? "left-full top-1/2 -translate-y-1/2 ml-1 text-[8px] sm:text-[10px]"
                                          : "-top-5 left-1/2 -translate-x-1/2 text-[10px] sm:text-[11px]"
                                        }`}
                       >
+                        {/* 2~3등 메달 표시 */}
+                        {is2nd && <span className="mr-0.5 text-[9px]">🥈</span>}
+                        {is3rd && <span className="mr-0.5 text-[9px]">🥉</span>}
                         <span className={`truncate inline-block
                           ${participants.length >= 11
-                            ? "max-w-[48px] sm:max-w-[72px] text-[7px] sm:text-[9px]"
+                            ? "max-w-[56px] sm:max-w-[80px] text-[8px] sm:text-[10px]"
                             : "max-w-[72px] sm:max-w-[96px] text-[9px] sm:text-[11px]"
                           }`}>
                           {name}

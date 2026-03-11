@@ -111,12 +111,31 @@
   60% { transform: scaleX(0.95) scaleY(1.04); }
 }
 
+@keyframes silver-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(192, 192, 192, 0.3), inset -2px -2px 5px rgba(0,0,0,0.06), inset 2px 2px 5px rgba(255,255,255,0.5); }
+  50% { box-shadow: 0 0 20px rgba(192, 192, 192, 0.7), inset -2px -2px 5px rgba(0,0,0,0.06), inset 2px 2px 5px rgba(255,255,255,0.5); }
+}
+
+@keyframes bronze-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(205, 127, 50, 0.3), inset -2px -2px 5px rgba(0,0,0,0.06), inset 2px 2px 5px rgba(255,255,255,0.5); }
+  50% { box-shadow: 0 0 20px rgba(205, 127, 50, 0.6), inset -2px -2px 5px rgba(0,0,0,0.06), inset 2px 2px 5px rgba(255,255,255,0.5); }
+}
+
+@keyframes sweat-drop {
+  0% { opacity: 0; transform: translate(0, -2px) scale(0.5); }
+  30% { opacity: 0.8; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-3px, 8px) scale(0.3); }
+}
+
 .animate-dust { animation: dust-puff 0.5s ease-out forwards; }
 .animate-snail-crawl { animation: snail-crawl 0.4s ease-in-out infinite; }
 .animate-winner-bounce { animation: winner-bounce 0.6s ease-in-out infinite; }
 .animate-winner-glow { animation: winner-glow 1.5s ease-in-out infinite; }
+.animate-silver-glow { animation: silver-glow 1.8s ease-in-out infinite; }
+.animate-bronze-glow { animation: bronze-glow 1.8s ease-in-out infinite; }
 .animate-trophy-pulse { animation: trophy-pulse 2s ease-in-out infinite; }
 .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
+.animate-sweat { animation: sweat-drop 0.7s ease-out forwards; }
 
 /* ── Reduced Motion ── */
 
@@ -124,9 +143,12 @@
   .animate-dust,
   .animate-winner-bounce,
   .animate-winner-glow,
+  .animate-silver-glow,
+  .animate-bronze-glow,
   .animate-trophy-pulse,
   .animate-slide-up,
-  .animate-snail-crawl {
+  .animate-snail-crawl,
+  .animate-sweat {
     animation: none !important;
   }
 

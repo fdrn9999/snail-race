@@ -170,18 +170,18 @@ export default function ParticipantInput({ onStart }: Props) {
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: i * 0.03, duration: 0.2 }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5
-                             text-clay-text rounded-xl text-sm font-body font-semibold
-                             border-2 clay-shadow
+                             rounded-xl text-sm font-body font-semibold
+                             border-2 clay-shadow transition-all duration-200
                              ${isTooLong
-                               ? "border-clay-danger/60"
-                               : "border-clay-border/30"
+                               ? "border-clay-danger/80 text-clay-danger ring-2 ring-clay-danger/20"
+                               : "border-clay-border/30 text-clay-text"
                              }`}
-                  style={{ backgroundColor: SNAIL_TAG_COLORS[i] }}
+                  style={{ backgroundColor: isTooLong ? "#FFEAEA" : SNAIL_TAG_COLORS[i] }}
                 >
-                  <span className="text-base" role="img" aria-label="달팽이">🐌</span>
-                  <span className="max-w-[100px] truncate">{displayName}</span>
+                  <span className="text-base" role="img" aria-label="달팽이">{isTooLong ? "⚠️" : "🐌"}</span>
+                  <span className={`max-w-[100px] truncate ${isTooLong ? "line-through decoration-clay-danger/50" : ""}`}>{displayName}</span>
                   {isTooLong && (
-                    <span className="text-clay-danger text-[10px] font-bold shrink-0">
+                    <span className="text-clay-danger text-[10px] font-bold shrink-0 bg-white/70 px-1 rounded">
                       {names[i].length}/8
                     </span>
                   )}
