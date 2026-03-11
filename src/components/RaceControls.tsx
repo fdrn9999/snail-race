@@ -12,9 +12,9 @@ const SHELL_COLORS = [
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const PODIUM_BG = [
-  "bg-clay-gold/30 border-clay-gold/60",
-  "bg-gray-200/50 border-gray-300/60",
-  "bg-orange-200/50 border-orange-300/60",
+  "bg-clay-gold border-clay-border",
+  "bg-clay-card border-clay-border",
+  "bg-clay-card border-clay-border",
 ];
 
 interface Props {
