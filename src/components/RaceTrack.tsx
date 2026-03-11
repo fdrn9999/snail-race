@@ -434,7 +434,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         {/* Top rail */}
         <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
-                        border-b-[3px] border-[#3E2723]">
+                        border-b-[3px] border-[#3E2723] relative overflow-hidden">
           <div className="flex gap-6 sm:gap-10 absolute inset-x-0 top-0 h-full items-end px-2 pointer-events-none" aria-hidden="true">
             {Array.from({ length: 14 }).map((_, i) => (
               <div key={i} className="w-[6px] h-full bg-[#4E342E] rounded-t-sm shrink-0 opacity-40" />
@@ -475,15 +475,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
                 className="relative border-b-[2px] border-[#3d7233] last:border-b-0 flex-1 min-h-0"
               >
                 <div className={`relative h-full ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}>
-                  {/* Grass mow stripes */}
-                  <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-                    <div
-                      className="w-full h-full opacity-[0.08]"
-                      style={{
-                        backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 30px, rgba(255,255,255,0.6) 30px, rgba(255,255,255,0.6) 60px)`,
-                      }}
-                    />
-                  </div>
 
                   {/* Grass tufts */}
                   <div className="absolute bottom-0 inset-x-0 pointer-events-none" aria-hidden="true">
