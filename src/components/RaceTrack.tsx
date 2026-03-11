@@ -646,10 +646,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
               whileTap={{ scale: 0.9 }}
               onClick={handleSkip}
               className="absolute top-12 sm:top-14 left-2 sm:left-3 z-25
-                         py-1.5 px-3 bg-white/90 text-clay-muted font-heading font-bold
-                         rounded-xl text-xs border-2 border-clay-border/15
-                         shadow-md cursor-pointer backdrop-blur-sm
-                         hover:text-clay-text hover:bg-white transition-all duration-200"
+                         py-1.5 px-3 bg-clay-card text-clay-text font-heading font-bold
+                         rounded-xl text-xs border-[3px] border-clay-border
+                         clay-shadow cursor-pointer
+                         hover:brightness-95 transition-all duration-200"
             >
               <span className="flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -16,18 +16,19 @@ export default function RaceControls({
   isRacing, countdown, raceState, startRace, handleRerace, onReset,
 }: Props) {
   return (
-    <div className="flex justify-center gap-3">
+    <div className="flex justify-center gap-3 sm:gap-4">
       {!isRacing && !raceState && countdown === null && (
         <motion.button
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
+          whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.95, y: 2 }}
           onClick={startRace}
-          className="py-3.5 px-8 bg-clay-success text-white font-heading font-bold
-                     rounded-2xl text-lg border-[3px] border-clay-border/20
+          className="py-3.5 px-8 bg-clay-gold text-clay-border font-heading font-bold
+                     rounded-2xl text-lg border-[3px] border-clay-border
                      clay-shadow cursor-pointer
-                     hover:brightness-95 transition-all duration-200"
+                     hover:brightness-105 transition-all duration-200"
         >
           <span className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -44,12 +45,13 @@ export default function RaceControls({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3 }}
+            whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.95, y: 2 }}
             onClick={handleRerace}
-            className="py-3 px-5 sm:px-6 bg-[#74B9FF] text-white font-heading font-bold
-                       rounded-2xl text-base border-[3px] border-clay-border/15
+            className="py-3 px-5 sm:px-6 bg-clay-gold text-clay-border font-heading font-bold
+                       rounded-2xl text-base border-[3px] border-clay-border
                        clay-shadow cursor-pointer
-                       hover:brightness-95 transition-all duration-200"
+                       hover:brightness-105 transition-all duration-200"
           >
             <span className="flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -62,10 +64,11 @@ export default function RaceControls({
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.08 }}
+            whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.95, y: 2 }}
             onClick={onReset}
-            className="py-3 px-5 sm:px-6 bg-clay-lilac text-clay-text font-heading font-bold
-                       rounded-2xl text-base border-[3px] border-clay-border/15
+            className="py-3 px-5 sm:px-6 bg-clay-card text-clay-text font-heading font-bold
+                       rounded-2xl text-base border-[3px] border-clay-border
                        clay-shadow cursor-pointer
                        hover:brightness-95 transition-all duration-200"
           >
