@@ -762,6 +762,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                 startRace={startRace}
                 handleRerace={handleRerace}
                 onReset={onReset}
+                participants={participants}
               />
             </motion.div>
           )}
