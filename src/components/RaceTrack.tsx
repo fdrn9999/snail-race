@@ -53,11 +53,24 @@ function getLaneHeight(count: number, isDesktop: boolean): number {
   return isDesktop ? 42 : 34; // 13-15명
 }
 
+/** 반응형 데스크톱 감지 훅 */
+function useIsDesktop(breakpoint = 640): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= breakpoint);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [breakpoint]);
+  return isDesktop;
+}
+
 export default function RaceTrack({ participants, onReset }: Props) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
   const [isRacing, setIsRacing] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showGo, setShowGo] = useState(false);
   const engineRef = useRef<ReturnType<typeof createRaceEngine> | null>(null);
   const animFrameRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -67,6 +80,18 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   /** 각 달팽이의 DOM 요소에 직접 transform 적용 (성능 최적화) */
   const snailRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /** 슬라임 트레일 DOM refs */
+  const slimeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /** 먼지 파티클 컨테이너 DOM refs */
+  const dustRefs = useRef<(HTMLDivElement | null)[]>([]);
+  /** 렌더 쓰로틀용 프레임 카운터 */
+  const frameCountRef = useRef(0);
+  /** 이전 finishOrder 길이 (변경 감지용) */
+  const prevFinishCountRef = useRef(0);
+
+  const isDesktop = useIsDesktop();
+  const laneHeight = getLaneHeight(participants.length, isDesktop);
+  const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
 
   const cleanup = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
@@ -102,16 +127,36 @@ export default function RaceTrack({ participants, onReset }: Props) {
     }, 200);
   }, []);
 
+  /** 슬라임·먼지를 DOM에서 직접 업데이트 (React 리렌더 없이) */
+  const updateEffects = useCallback((positions: number[]) => {
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      const slimeEl = slimeRefs.current[i];
+      if (slimeEl) {
+        if (pos > 2) {
+          slimeEl.style.display = "block";
+          slimeEl.style.width = `${Math.min(pos * 0.6, 40)}px`;
+        } else {
+          slimeEl.style.display = "none";
+        }
+      }
+      const dustEl = dustRefs.current[i];
+      if (dustEl) {
+        dustEl.style.display = pos > 3 ? "block" : "none";
+      }
+    }
+  }, []);
+
   /** 레이스를 즉시 종료 (스킵) — 엔진을 빠르게 시뮬레이션 */
   const handleSkip = useCallback(() => {
     if (!engineRef.current || !isRacing) return;
     cancelAnimationFrame(animFrameRef.current);
 
-    // 엔진을 100ms 단위로 빠르게 돌려 전체 순위 확정
+    // 엔진을 REF_DT(16.67ms) 단위로 돌려 순위 정밀도 보장
     let t = lastTimestamp.current;
     let state = engineRef.current.update(t);
     while (!state.finished) {
-      t += 100;
+      t += 16.67;
       state = engineRef.current.update(t);
     }
 
@@ -127,6 +172,13 @@ export default function RaceTrack({ participants, onReset }: Props) {
         }
       }
     }
+    // 슬라임·먼지 숨기기
+    for (let i = 0; i < participants.length; i++) {
+      const slimeEl = slimeRefs.current[i];
+      if (slimeEl) slimeEl.style.display = "none";
+      const dustEl = dustRefs.current[i];
+      if (dustEl) dustEl.style.display = "none";
+    }
 
     setRaceState(state);
     setIsRacing(false);
@@ -135,7 +187,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       fireConfetti();
       scrollToResult();
     }, 300);
-  }, [isRacing, fireConfetti, scrollToResult, participants.length]);
+  }, [isRacing, fireConfetti, scrollToResult, participants.length, updateEffects]);
 
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
@@ -148,6 +200,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
     engineRef.current = engine;
     snailRefs.current = new Array(participants.length).fill(null);
+    slimeRefs.current = new Array(participants.length).fill(null);
+    dustRefs.current = new Array(participants.length).fill(null);
+    frameCountRef.current = 0;
+    prevFinishCountRef.current = 0;
     setRaceState(null);
     setShowResult(false);
 
@@ -161,6 +217,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
       } else {
         setCountdown(null);
         if (countIntervalRef.current) clearInterval(countIntervalRef.current);
+
+        // "출발!" 표시 후 레이스 시작
+        setShowGo(true);
+        setTimeout(() => setShowGo(false), 600);
+
         setIsRacing(true);
         startTimeRef.current = performance.now();
 
@@ -182,12 +243,28 @@ export default function RaceTrack({ participants, onReset }: Props) {
             }
           }
 
-          setRaceState(state);
+          // 슬라임·먼지 이펙트 DOM 직접 조작
+          updateEffects(state.positions);
+
+          // 쓰로틀: 5프레임마다 또는 finishOrder 변경 시만 React state 갱신
+          frameCountRef.current++;
+          const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
+          if (finishChanged || frameCountRef.current % 5 === 0 || state.finished) {
+            prevFinishCountRef.current = state.finishOrder.length;
+            setRaceState(state);
+          }
 
           if (!state.finished) {
             animFrameRef.current = requestAnimationFrame(animate);
           } else {
             setIsRacing(false);
+            // 이펙트 숨기기
+            for (let i = 0; i < participants.length; i++) {
+              const slimeEl = slimeRefs.current[i];
+              if (slimeEl) slimeEl.style.display = "none";
+              const dustEl = dustRefs.current[i];
+              if (dustEl) dustEl.style.display = "none";
+            }
             setTimeout(() => {
               setShowResult(true);
               fireConfetti();
@@ -198,7 +275,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
         animFrameRef.current = requestAnimationFrame(animate);
       }
     }, 1000);
-  }, [participants, fireConfetti, scrollToResult]);
+  }, [participants, fireConfetti, scrollToResult, updateEffects]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -208,17 +285,13 @@ export default function RaceTrack({ participants, onReset }: Props) {
     setShowResult(false);
     setIsRacing(false);
     setCountdown(null);
+    setShowGo(false);
     setTimeout(() => startRace(), 80);
   };
 
   const winnerName =
     raceState && showResult ? participants[raceState.winnerId] : null;
   const rankings = raceState?.finishOrder || [];
-
-  // 레인 높이 (참가자 수에 따라 유동)
-  const laneHeightMobile = getLaneHeight(participants.length, false);
-  const laneHeightDesktop = getLaneHeight(participants.length, true);
-  const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
 
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-6 sm:pt-10 pb-8">
@@ -270,14 +343,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
               >
                 <div
                   className={`relative ${isEven ? "bg-[#5CA03A]" : "bg-[#4E9132]"}`}
-                  style={{
-                    height: `${laneHeightMobile}px`,
-                  }}
+                  style={{ height: `${laneHeight}px` }}
                 >
-                  {/* Desktop height override via media query inline workaround */}
-                  <style>{`@media(min-width:640px){[data-lane="${index}"]{height:${laneHeightDesktop}px!important}}`}</style>
-                  <div data-lane={index} className="absolute inset-0" />
-
                   {/* Grass mow stripes */}
                   <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
                     <div
@@ -346,40 +413,42 @@ export default function RaceTrack({ participants, onReset }: Props) {
                       transform: "translateY(-50%) translateX(0px)",
                     }}
                   >
-                    {/* Slime trail */}
-                    {isRacing && (raceState?.positions[index] || 0) > 2 && (
-                      <div
-                        className="absolute right-full top-1/2 -translate-y-1/2 h-[6px] rounded-full pointer-events-none opacity-40"
-                        style={{
-                          width: `${Math.min((raceState?.positions[index] || 0) * 0.6, 40)}px`,
-                          background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45))",
-                        }}
-                      />
-                    )}
+                    {/* Slime trail — always rendered, visibility via ref */}
+                    <div
+                      ref={(el) => { slimeRefs.current[index] = el; }}
+                      className="absolute right-full top-1/2 -translate-y-1/2 h-[6px] rounded-full pointer-events-none opacity-40"
+                      style={{
+                        display: "none",
+                        width: "0px",
+                        background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45))",
+                      }}
+                    />
 
-                    {/* Dust cloud particles */}
-                    {isRacing && (raceState?.positions[index] || 0) > 3 && (
-                      <div className="absolute -left-1 top-1/2 -translate-y-1/2 pointer-events-none">
-                        {[0, 1, 2, 3].map((d) => (
-                          <span
-                            key={d}
-                            className="absolute animate-dust rounded-full"
-                            style={{
-                              animationDelay: `${d * 0.14}s`,
-                              top: `${-6 + d * 4}px`,
-                              width: `${5 - d}px`,
-                              height: `${5 - d}px`,
-                              backgroundColor: "#C9A96E",
-                              opacity: 0.6,
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    {/* Dust cloud particles — always rendered, visibility via ref */}
+                    <div
+                      ref={(el) => { dustRefs.current[index] = el; }}
+                      className="absolute -left-1 top-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ display: "none" }}
+                    >
+                      {[0, 1, 2, 3].map((d) => (
+                        <span
+                          key={d}
+                          className="absolute animate-dust rounded-full"
+                          style={{
+                            animationDelay: `${d * 0.14}s`,
+                            top: `${-6 + d * 4}px`,
+                            width: `${5 - d}px`,
+                            height: `${5 - d}px`,
+                            backgroundColor: "#C9A96E",
+                            opacity: 0.6,
+                          }}
+                        />
+                      ))}
+                    </div>
 
                     {/* Snail container */}
                     <div className={`relative flex items-center ${isWinner ? "animate-winner-bounce" : ""}`}>
-                      <div className={`relative ${isWinner ? "animate-winner-glow rounded-2xl" : ""}`}>
+                      <div className={`relative ${isWinner ? "animate-winner-glow rounded-2xl" : ""} ${isRacing ? "animate-snail-crawl" : ""}`}>
                         <SnailSvg
                           shellColor={SHELL_COLORS[index % SHELL_COLORS.length]}
                           size={snailSize}
@@ -458,6 +527,31 @@ export default function RaceTrack({ participants, onReset }: Props) {
               >
                 <span className="text-5xl sm:text-6xl font-heading font-bold text-clay-text">
                   {countdown}
+                </span>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* "출발!" Go cue */}
+        <AnimatePresence>
+          {showGo && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/40 z-30 pointer-events-none"
+            >
+              <motion.div
+                initial={{ scale: 3, opacity: 0, rotate: -10 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                exit={{ scale: 0.5, opacity: 0, y: -30 }}
+                transition={{ type: "spring", damping: 12, stiffness: 300 }}
+                className="px-8 py-4 bg-clay-gold rounded-3xl border-[4px] border-clay-border clay-shadow-lg"
+              >
+                <span className="text-4xl sm:text-5xl font-heading font-bold text-clay-border tracking-wide">
+                  출발!
                 </span>
               </motion.div>
             </motion.div>

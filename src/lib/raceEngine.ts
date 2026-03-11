@@ -25,6 +25,12 @@ export function createRaceEngine(config: RaceConfig) {
     burstChance: 0.02 + Math.random() * 0.03,
   }));
 
+  // 패배자별 최종 도착 목표 위치 (고정값 — 투명벽 대신 자연스러운 감속 목표)
+  const snailFinalTargets = Array.from({ length: participantCount }, (_, i) => {
+    if (i === predeterminedWinner) return 100;
+    return 78 + Math.random() * 14; // 78~92 사이에 분산
+  });
+
   const positions = new Array(participantCount).fill(0);
   const finishOrder: number[] = [];
   const finishedSet = new Set<number>();
@@ -94,9 +100,15 @@ export function createRaceEngine(config: RaceConfig) {
           const convergence = 1 - Math.pow(1 - 0.15, scale);
           positions[i] += Math.max(movement, currentGap * convergence);
         } else {
-          const maxPos = 70 + Math.random() * 22;
-          if (positions[i] < maxPos) {
-            positions[i] += movement * (0.3 + Math.random() * 0.3);
+          // Ease-out 감속: 고정 목표 위치를 향해 자연스럽게 수렴
+          const target = snailFinalTargets[i];
+          const remaining = target - positions[i];
+          if (remaining > 0.05) {
+            const easeOut = 1 - Math.pow(1 - 0.08, scale);
+            positions[i] += Math.max(movement * 0.3, remaining * easeOut);
+          } else {
+            // 목표 부근에서 미세한 흔들림 (살아있는 느낌)
+            positions[i] += (Math.random() - 0.5) * 0.1 * scale;
           }
         }
       } else {

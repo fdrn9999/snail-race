@@ -8,44 +8,36 @@ interface Props {
 }
 
 const SNAIL_TAG_COLORS = [
-  "bg-clay-peach",
-  "bg-clay-blue",
-  "bg-clay-mint",
-  "bg-clay-lilac",
-  "bg-clay-yellow",
-  "bg-clay-pink",
-  "bg-clay-peach",
-  "bg-clay-blue",
-  "bg-clay-mint",
-  "bg-clay-lilac",
-  "bg-clay-yellow",
-  "bg-clay-pink",
-  "bg-clay-peach",
-  "bg-clay-blue",
-  "bg-clay-mint",
+  "#FDBCB4", "#ADD8E6", "#98FF98", "#E6E6FA", "#FFEAA7",
+  "#FF9ECD", "#FFB347", "#B5EAD7", "#C7CEEA", "#FFDAC1",
+  "#E2F0CB", "#D4A5A5", "#9ED2C6", "#F3D1F4", "#FFE5B4",
 ];
 
 /** 줄바꿈, 쉼표, 탭 등 다양한 구분자로 이름 분리 */
-function parseNames(text: string): { names: string[]; hasTruncated: boolean } {
-  let hasTruncated = false;
-  const names = text
+function parseNames(text: string): {
+  names: string[];
+  truncatedIndices: Set<number>;
+} {
+  const truncatedIndices = new Set<number>();
+  const raw = text
     .split(/[\n,\t]+/)
     .map((n) => n.trim())
-    .filter(Boolean)
-    .map((n) => {
-      if (n.length > 8) {
-        hasTruncated = true;
-        return n.slice(0, 8);
-      }
-      return n;
-    });
-  return { names, hasTruncated };
+    .filter(Boolean);
+
+  const names = raw.map((n, i) => {
+    if (n.length > 8) {
+      truncatedIndices.add(i);
+      return n.slice(0, 8);
+    }
+    return n;
+  });
+  return { names, truncatedIndices };
 }
 
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
 
-  const { names, hasTruncated } = parseNames(text);
+  const { names, truncatedIndices } = parseNames(text);
   const validCount = Math.min(names.length, 15);
 
   function handleStart() {
@@ -57,6 +49,17 @@ export default function ParticipantInput({ onStart }: Props) {
   function handleShuffle() {
     const shuffled = [...names].sort(() => Math.random() - 0.5);
     setText(shuffled.join("\n"));
+  }
+
+  function handleClear() {
+    setText("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleStart();
+    }
   }
 
   return (
@@ -76,7 +79,7 @@ export default function ParticipantInput({ onStart }: Props) {
             참가자 이름을 입력하세요 (최대 15명, 8자 이내)
           </p>
           <p className="font-body text-clay-muted/60 text-xs mt-1">
-            줄바꿈 / 쉼표 / 탭으로 구분 가능
+            줄바꿈 / 쉼표 / 탭으로 구분 · Ctrl+Enter로 시작
           </p>
         </div>
 
@@ -89,8 +92,9 @@ export default function ParticipantInput({ onStart }: Props) {
             id="participant-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={"철수, 영희, 민수\n또는 한 줄에 한 명씩..."}
-            className="w-full h-32 sm:h-48 p-4 border-[3px] border-clay-border rounded-2xl text-base
+            className="w-full h-32 sm:h-48 p-4 pr-10 border-[3px] border-clay-border rounded-2xl text-base
                        font-body font-medium text-clay-text
                        focus:outline-none focus:ring-4 focus:ring-clay-accent/30 focus:border-clay-accent
                        resize-none bg-clay-lilac/20 placeholder-clay-muted/70
@@ -98,6 +102,22 @@ export default function ParticipantInput({ onStart }: Props) {
             spellCheck={false}
             aria-label="참가자 이름을 줄바꿈, 쉼표, 탭으로 구분하여 입력"
           />
+          {/* Clear button */}
+          {text.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center
+                         rounded-full bg-clay-muted/15 text-clay-muted
+                         hover:bg-clay-danger/20 hover:text-clay-danger
+                         transition-colors duration-150 cursor-pointer"
+              aria-label="입력 내용 전체 삭제"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
           {/* Count indicator */}
           <span className="absolute bottom-3 right-3 text-xs font-body text-clay-muted/60">
             {validCount}/15명
@@ -111,21 +131,33 @@ export default function ParticipantInput({ onStart }: Props) {
             animate={{ opacity: 1 }}
             className="mt-4 flex flex-wrap gap-2"
           >
-            {names.slice(0, 15).map((name, i) => (
-              <motion.span
-                key={`${i}-${name}`}
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: i * 0.03, duration: 0.2 }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5
-                           ${SNAIL_TAG_COLORS[i]}
-                           text-clay-text rounded-xl text-sm font-body font-semibold
-                           border-2 border-clay-border/30 clay-shadow`}
-              >
-                <span className="text-base" role="img" aria-label="달팽이">🐌</span>
-                <span className="max-w-[100px] truncate">{name}</span>
-              </motion.span>
-            ))}
+            {names.slice(0, 15).map((name, i) => {
+              const isTruncated = truncatedIndices.has(i);
+              return (
+                <motion.span
+                  key={`${i}-${name}`}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.03, duration: 0.2 }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5
+                             text-clay-text rounded-xl text-sm font-body font-semibold
+                             border-2 clay-shadow
+                             ${isTruncated
+                               ? "border-clay-danger/60"
+                               : "border-clay-border/30"
+                             }`}
+                  style={{ backgroundColor: SNAIL_TAG_COLORS[i] }}
+                >
+                  <span className="text-base" role="img" aria-label="달팽이">🐌</span>
+                  <span className="max-w-[100px] truncate">{name}</span>
+                  {isTruncated && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-clay-danger shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label="이름이 잘림">
+                      <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  )}
+                </motion.span>
+              );
+            })}
             {names.length > 15 && (
               <span className="text-clay-danger text-sm font-bold self-center font-body">
                 +{names.length - 15}명 초과
@@ -177,7 +209,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
         {/* Feedback messages */}
         <div className="mt-3 space-y-1 text-center">
-          {hasTruncated && (
+          {truncatedIndices.size > 0 && (
             <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
               8자를 초과한 이름이 자동으로 잘렸습니다
             </p>
