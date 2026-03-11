@@ -241,6 +241,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     setRaceState(null);
 
     setCountdown(3);
+    playBgm();
     let count = 3;
 
     countIntervalRef.current = setInterval(() => {
@@ -256,7 +257,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         setIsRacing(true);
         startTimeRef.current = performance.now();
-        playBgm();
 
         const animate = (timestamp: number) => {
           let elapsed = timestamp - startTimeRef.current;
