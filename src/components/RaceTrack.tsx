@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import confetti from "canvas-confetti";
 import { createRaceEngine, type RaceState } from "@/lib/raceEngine";
 
@@ -345,49 +345,53 @@ export default function RaceTrack({ participants, onReset }: Props) {
             <div className="bg-clay-card/90 backdrop-blur-sm rounded-xl border-2 border-clay-border/20
                             px-2 sm:px-3 py-1.5">
               {raceState ? (
-                <div className="flex items-center justify-center gap-x-1 sm:gap-x-1.5 flex-wrap gap-y-0.5">
-                  {liveRankings.map((participantIdx, rank) => {
-                    const isConfirmed = rank < finishOrder.length;
-                    const isTop3 = rank < 3;
-                    const medal = isConfirmed && isTop3
-                      ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
-                      : null;
+                <LayoutGroup>
+                  <div className="flex items-center justify-center gap-x-1 sm:gap-x-1.5 flex-wrap gap-y-0.5">
+                    {liveRankings.map((participantIdx, rank) => {
+                      const isConfirmed = rank < finishOrder.length;
+                      const isTop3 = rank < 3;
+                      const medal = isConfirmed && isTop3
+                        ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
+                        : null;
 
-                    return (
-                      <span
-                        key={`rank-${participantIdx}`}
-                        className={`inline-flex items-center gap-0.5 shrink-0
-                          ${isTop3
-                            ? `px-1.5 sm:px-2 py-0.5 rounded-lg border
-                               ${isConfirmed
-                                 ? rank === 0
-                                   ? "bg-clay-gold/25 border-clay-gold/50"
-                                   : rank === 1
-                                     ? "bg-clay-lilac/20 border-clay-lilac/40"
-                                     : "bg-clay-peach/15 border-clay-peach/35"
-                                 : "bg-clay-bg/40 border-clay-border/8"
-                               }`
-                            : "px-0.5"
-                          }`}
-                      >
-                        <span className={`font-heading font-bold
-                          ${isTop3
-                            ? `text-[11px] sm:text-xs ${isConfirmed ? "" : "text-clay-muted/50"}`
-                            : `text-[9px] sm:text-[10px] ${isConfirmed ? "text-clay-muted/70" : "text-clay-muted/35"}`
-                          }`}>
-                          {medal || `${rank + 1}`}
-                        </span>
-                        <span className={`font-body font-semibold truncate
-                          ${isTop3
-                            ? `text-[11px] sm:text-xs max-w-[48px] sm:max-w-[64px] ${isConfirmed ? "text-clay-text" : "text-clay-muted/50"}`
-                            : `text-[9px] sm:text-[10px] max-w-[36px] sm:max-w-[48px] ${isConfirmed ? "text-clay-muted" : "text-clay-muted/40"}`
-                          }`}>
-                          {participants[participantIdx]}
-                        </span>
-                      </span>
-                    );
-                  })}
-                </div>
+                      return (
+                        <motion.span
+                          key={`rank-${participantIdx}`}
+                          layout
+                          transition={{ type: "spring", stiffness: 300, damping: 28, mass: 0.8 }}
+                          className={`inline-flex items-center gap-0.5 shrink-0
+                            ${isTop3
+                              ? `px-1.5 sm:px-2 py-0.5 rounded-lg border
+                                 ${isConfirmed
+                                   ? rank === 0
+                                     ? "bg-clay-gold/25 border-clay-gold/50"
+                                     : rank === 1
+                                       ? "bg-clay-lilac/20 border-clay-lilac/40"
+                                       : "bg-clay-peach/15 border-clay-peach/35"
+                                   : "bg-clay-bg/40 border-clay-border/8"
+                                 }`
+                              : "px-0.5"
+                            }`}
+                        >
+                          <span className={`font-heading font-bold
+                            ${isTop3
+                              ? `text-[11px] sm:text-xs ${isConfirmed ? "" : "text-clay-muted/50"}`
+                              : `text-[9px] sm:text-[10px] ${isConfirmed ? "text-clay-muted/70" : "text-clay-muted/35"}`
+                            }`}>
+                            {medal || `${rank + 1}`}
+                          </span>
+                          <span className={`font-body font-semibold truncate
+                            ${isTop3
+                              ? `text-[11px] sm:text-xs max-w-[48px] sm:max-w-[64px] ${isConfirmed ? "text-clay-text" : "text-clay-muted/50"}`
+                              : `text-[9px] sm:text-[10px] max-w-[36px] sm:max-w-[48px] ${isConfirmed ? "text-clay-muted" : "text-clay-muted/40"}`
+                            }`}>
+                            {participants[participantIdx]}
+                          </span>
+                        </motion.span>
+                      );
+                    })}
+                  </div>
+                </LayoutGroup>
               ) : (
                 <div className="text-center">
                   <span className="font-heading font-bold text-[11px] sm:text-xs text-clay-muted">
