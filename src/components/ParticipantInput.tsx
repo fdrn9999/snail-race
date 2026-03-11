@@ -246,7 +246,7 @@ export default function ParticipantInput({ onStart }: Props) {
         </div>
 
         {/* Feedback messages */}
-        <div className="mt-3 space-y-1 text-center">
+        <div className="mt-3 space-y-1 text-center" aria-live="polite" aria-relevant="additions removals">
           {hasTooLong && (
             <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
               8자를 초과한 이름이 있습니다 — 줄여주세요!
