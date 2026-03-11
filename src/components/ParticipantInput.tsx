@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 
 interface Props {
@@ -36,9 +36,21 @@ function parseNames(text: string): {
 
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
+  const [shaking, setShaking] = useState(false);
+  const prevTruncCount = useRef(0);
 
   const { names, truncatedIndices } = parseNames(text);
   const validCount = Math.min(names.length, 15);
+
+  // 잘린 이름이 새로 생기면 shake 트리거
+  useEffect(() => {
+    if (truncatedIndices.size > prevTruncCount.current) {
+      setShaking(true);
+      const timer = setTimeout(() => setShaking(false), 400);
+      return () => clearTimeout(timer);
+    }
+    prevTruncCount.current = truncatedIndices.size;
+  }, [truncatedIndices.size]);
 
   function handleStart() {
     const finalNames = names.slice(0, 15);
@@ -53,6 +65,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
   function handleClear() {
     setText("");
+    prevTruncCount.current = 0;
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -84,7 +97,7 @@ export default function ParticipantInput({ onStart }: Props) {
         </div>
 
         {/* Textarea */}
-        <div className="relative">
+        <div className={`relative ${shaking ? "animate-input-shake" : ""}`}>
           <label htmlFor="participant-input" className="sr-only">
             참가자 이름 입력
           </label>
@@ -94,11 +107,12 @@ export default function ParticipantInput({ onStart }: Props) {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={"철수, 영희, 민수\n또는 한 줄에 한 명씩..."}
-            className="w-full h-32 sm:h-48 p-4 pr-10 border-[3px] border-clay-border rounded-2xl text-base
+            className={`w-full h-32 sm:h-48 p-4 pr-10 border-[3px] rounded-2xl text-base
                        font-body font-medium text-clay-text
                        focus:outline-none focus:ring-4 focus:ring-clay-accent/30 focus:border-clay-accent
                        resize-none bg-clay-lilac/20 placeholder-clay-muted/70
-                       clay-shadow-inset transition-colors duration-200"
+                       clay-shadow-inset transition-colors duration-200
+                       ${shaking ? "border-clay-danger" : "border-clay-border"}`}
             spellCheck={false}
             aria-label="참가자 이름을 줄바꿈, 쉼표, 탭으로 구분하여 입력"
           />

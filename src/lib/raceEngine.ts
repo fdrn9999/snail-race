@@ -28,7 +28,7 @@ export function createRaceEngine(config: RaceConfig) {
   // 패배자별 최종 도착 목표 위치 (고정값 — 투명벽 대신 자연스러운 감속 목표)
   const snailFinalTargets = Array.from({ length: participantCount }, (_, i) => {
     if (i === predeterminedWinner) return 100;
-    return 78 + Math.random() * 14; // 78~92 사이에 분산
+    return 82 + Math.random() * 15; // 82~97 사이에 넓게 분산 (고무줄 현상 완화)
   });
 
   const positions = new Array(participantCount).fill(0);
