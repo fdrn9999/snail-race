@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import confetti from "canvas-confetti";
 import { createRaceEngine, type RaceState } from "@/lib/raceEngine";
 import SnailSvg from "./SnailSvg";
@@ -20,6 +20,21 @@ const SHELL_COLORS = [
 ];
 
 const RACE_DURATION = 30000;
+
+function BgmIcon({ muted, className }: { muted: boolean; className: string }) {
+  if (muted) {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 5 6 9H2v6h4l5 4V5z" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
+      </svg>
+    );
+  }
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
 
 export default function RaceTrack({ participants, onReset }: Props) {
   const [raceState, setRaceState] = useState<RaceState | null>(null);
@@ -423,30 +438,126 @@ export default function RaceTrack({ participants, onReset }: Props) {
         countdown={countdown}
         raceFinished={raceFinished}
         raceState={raceState}
-        bgmMuted={bgmMuted}
-        toggleBgm={toggleBgm}
-        liveRankings={liveRankings}
-        finishOrder={finishOrder}
       />
 
       {/* ══════ Race Track ══════ */}
       <div className="flex-1 min-h-0 relative rounded-3xl border-[3px] border-clay-border clay-shadow-lg overflow-hidden flex flex-col">
 
-        {/* Top rail */}
-        <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center justify-between px-4 sm:px-6
+        {/* Top rail — controls bar */}
+        <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center px-2 sm:px-3 gap-1.5 sm:gap-2
                         border-b-[3px] border-[#3E2723] relative overflow-hidden">
-          <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest z-10
-                           bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15">
-            Start
-          </span>
-          <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest z-10
-                           bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15 flex items-center gap-1.5">
-            Finish
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <line x1="4" y1="22" x2="4" y2="15" />
-            </svg>
-          </span>
+
+          {/* Left: Start label / Skip button */}
+          <div className="shrink-0 z-10">
+            {!isRacing && !raceFinished && (
+              <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest
+                               bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15">
+                Start
+              </span>
+            )}
+            <AnimatePresence>
+              {isRacing && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ delay: 3, duration: 0.3 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleSkip}
+                  className="flex items-center gap-1 bg-[#4E342E] px-2 sm:px-3 py-1 rounded-lg
+                             border border-white/15 text-white/90 font-heading font-bold text-[10px] sm:text-xs
+                             hover:bg-[#3E2723] transition-colors cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polygon points="5 4 15 12 5 20 5 4" />
+                    <line x1="19" y1="5" x2="19" y2="19" />
+                  </svg>
+                  스킵
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Center: Live ranking */}
+          <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
+            {(countdown !== null || isRacing || raceFinished) && raceState ? (
+              <LayoutGroup>
+                <div className="flex items-center justify-center gap-x-1 sm:gap-x-1.5 flex-nowrap">
+                  {liveRankings.map((participantIdx, rank) => {
+                    const isConfirmed = rank < finishOrder.length;
+                    const isTop3 = rank < 3;
+                    const medal = isConfirmed && isTop3
+                      ? (rank === 0 ? "🥇" : rank === 1 ? "🥈" : "🥉")
+                      : null;
+                    return (
+                      <motion.span
+                        key={`rank-${participantIdx}`}
+                        layout
+                        transition={{ type: "spring", stiffness: 200, damping: 35, mass: 1 }}
+                        className={`inline-flex items-center gap-0.5 shrink-0
+                          ${isTop3
+                            ? `px-1.5 py-0.5 rounded-md
+                               ${isConfirmed
+                                 ? rank === 0
+                                   ? "bg-yellow-500/25 border border-yellow-400/40"
+                                   : rank === 1
+                                     ? "bg-gray-300/20 border border-gray-300/30"
+                                     : "bg-orange-400/20 border border-orange-400/30"
+                                 : "bg-white/8 border border-white/10"
+                               }`
+                            : "px-0.5"
+                          }`}
+                      >
+                        <span className={`font-heading font-bold
+                          ${isTop3
+                            ? `text-[10px] sm:text-[11px] ${isConfirmed ? "text-white" : "text-white/30"}`
+                            : `text-[8px] sm:text-[9px] ${isConfirmed ? "text-white/50" : "text-white/20"}`
+                          }`}>
+                          {medal || `${rank + 1}`}
+                        </span>
+                        <span className={`font-body font-semibold truncate
+                          ${isTop3
+                            ? `text-[10px] sm:text-[11px] max-w-[40px] sm:max-w-[56px] ${isConfirmed ? "text-white/90" : "text-white/30"}`
+                            : `text-[8px] sm:text-[9px] max-w-[28px] sm:max-w-[40px] ${isConfirmed ? "text-white/50" : "text-white/20"}`
+                          }`}>
+                          {participants[participantIdx]}
+                        </span>
+                      </motion.span>
+                    );
+                  })}
+                </div>
+              </LayoutGroup>
+            ) : countdown !== null ? (
+              <div className="text-center">
+                <span className="font-heading font-bold text-[10px] sm:text-xs text-white/50">
+                  준비 중...
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Right: Volume toggle + Finish label */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 z-10">
+            <button
+              type="button"
+              onClick={toggleBgm}
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg
+                         bg-[#4E342E] border border-white/15
+                         text-white/80 hover:text-white hover:bg-[#3E2723]
+                         transition-colors duration-150 cursor-pointer"
+              aria-label={bgmMuted ? "배경음악 켜기" : "배경음악 끄기"}
+            >
+              <BgmIcon muted={bgmMuted} className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest
+                             bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15 flex items-center gap-1.5">
+              Finish
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                <line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+            </span>
+          </div>
         </div>
 
         {/* Lanes */}
@@ -665,33 +776,6 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
         {/* Bottom rail */}
         <div className="shrink-0 h-5 sm:h-6 bg-gradient-to-t from-[#5D4037] to-[#795548] border-t-[3px] border-[#3E2723]" />
-
-        {/* Skip button */}
-        <AnimatePresence>
-          {isRacing && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ delay: 3, duration: 0.3 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleSkip}
-              className="absolute top-12 sm:top-14 left-2 sm:left-3 z-25
-                         py-1.5 px-3 bg-clay-card text-clay-text font-heading font-bold
-                         rounded-xl text-xs border-[3px] border-clay-border
-                         clay-shadow cursor-pointer
-                         hover:brightness-95 transition-all duration-200"
-            >
-              <span className="flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polygon points="5 4 15 12 5 20 5 4" />
-                  <line x1="19" y1="5" x2="19" y2="19" />
-                </svg>
-                스킵
-              </span>
-            </motion.button>
-          )}
-        </AnimatePresence>
 
         {/* Countdown overlay */}
         <AnimatePresence>
