@@ -188,14 +188,14 @@ export default function Home() {
             </section>
           </main>
 
-          <footer className="py-4 text-center font-body text-[11px] text-clay-muted/60 space-x-3">
-            <span>Made by 정진호(fdrn9999)</span>
+          <footer className="py-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-body text-[11px] text-clay-muted/60">
+            <span className="whitespace-nowrap">Made by 정진호(fdrn9999)</span>
             <a href="https://github.com/fdrn9999" target="_blank" rel="noopener noreferrer"
-               className="hover:text-clay-muted transition-colors">GitHub</a>
+               className="whitespace-nowrap hover:text-clay-muted transition-colors">GitHub</a>
             <a href="mailto:ckato9173@gmail.com"
-               className="hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
+               className="whitespace-nowrap hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
             <span className="text-clay-muted/30">|</span>
-            <a href="/privacy" className="hover:text-clay-muted transition-colors">개인정보처리방침</a>
+            <a href="/privacy" className="whitespace-nowrap hover:text-clay-muted transition-colors">개인정보처리방침</a>
           </footer>
         </>
       ) : (
@@ -206,12 +206,14 @@ export default function Home() {
               onReset={goHome}
             />
           </main>
-          <footer className="shrink-0 py-1.5 text-center font-body text-[10px] text-clay-muted/50 space-x-2">
-            <span>Made by 정진호(fdrn9999)</span>
+          <footer className="shrink-0 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-body text-[11px] text-clay-muted/60">
+            <span className="whitespace-nowrap">Made by 정진호(fdrn9999)</span>
             <a href="https://github.com/fdrn9999" target="_blank" rel="noopener noreferrer"
-               className="hover:text-clay-muted transition-colors">GitHub</a>
+               className="whitespace-nowrap hover:text-clay-muted transition-colors">GitHub</a>
             <a href="mailto:ckato9173@gmail.com"
-               className="hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
+               className="whitespace-nowrap hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
+            <span className="text-clay-muted/30">|</span>
+            <a href="/privacy" className="whitespace-nowrap hover:text-clay-muted transition-colors">개인정보처리방침</a>
           </footer>
         </div>
       )}

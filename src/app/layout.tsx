@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  icons: {
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
   title: "Snail Race - 달팽이 레이싱 추첨 게임 | 무료 온라인 추첨",
   description:
     "참가자 이름을 입력하고 달팽이 레이싱으로 재미있게 추첨하세요! 워크숍, 파티, 팀빌딩, 수업에서 발표 순서 정하기, 당첨자 뽑기에 딱 맞는 무료 온라인 추첨 게임. 최대 15명까지 지원, 설치 없이 브라우저에서 바로 사용 가능합니다.",
