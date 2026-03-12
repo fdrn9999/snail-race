@@ -43,19 +43,19 @@ export default function RaceControls({
                      shadow-[inset_-2px_-2px_6px_rgba(0,0,0,0.3),inset_2px_2px_6px_rgba(255,255,255,0.08),4px_4px_0px_rgba(0,0,0,0.2)]"
         >
           {/* Mini podium — top 3 */}
-          <div className="flex items-end gap-1.5 sm:gap-2">
+          <div className="flex items-end gap-2 sm:gap-3">
             {/* 2nd */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.15, duration: 0.3 }}
-              className="flex flex-col items-center px-2.5 pt-1 pb-1
+              className="flex flex-col items-center px-3 sm:px-3.5 pt-1.5 pb-1
                          bg-[#4E342E] rounded-xl border border-white/15"
             >
-              <span className="text-sm leading-none">{MEDALS[1]}</span>
-              <SnailSvg shellColor={SHELL_COLORS[finishOrder[1] % SHELL_COLORS.length]} size={20} />
-              <span className="font-heading font-bold text-[9px] sm:text-[10px] text-white/90
-                               max-w-[48px] sm:max-w-[64px] truncate">
+              <span className="text-base leading-none">{MEDALS[1]}</span>
+              <SnailSvg shellColor={SHELL_COLORS[finishOrder[1] % SHELL_COLORS.length]} size={26} />
+              <span className="font-heading font-bold text-[10px] sm:text-[11px] text-white/90
+                               max-w-[52px] sm:max-w-[68px] truncate mt-0.5">
                 {participants[finishOrder[1]]}
               </span>
             </motion.div>
@@ -65,13 +65,13 @@ export default function RaceControls({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.05, duration: 0.3 }}
-              className="flex flex-col items-center px-3 pt-1 pb-1
+              className="flex flex-col items-center px-3.5 sm:px-4 pt-1.5 pb-1.5
                          bg-clay-gold/30 rounded-xl border border-clay-gold/50 -mt-1"
             >
-              <span className="text-base leading-none">{MEDALS[0]}</span>
-              <SnailSvg shellColor={SHELL_COLORS[finishOrder[0] % SHELL_COLORS.length]} size={24} />
-              <span className="font-heading font-bold text-[10px] sm:text-xs text-white
-                               max-w-[56px] sm:max-w-[72px] truncate">
+              <span className="text-lg leading-none">{MEDALS[0]}</span>
+              <SnailSvg shellColor={SHELL_COLORS[finishOrder[0] % SHELL_COLORS.length]} size={32} />
+              <span className="font-heading font-bold text-[11px] sm:text-xs text-white
+                               max-w-[60px] sm:max-w-[76px] truncate mt-0.5">
                 {participants[finishOrder[0]]}
               </span>
             </motion.div>
@@ -81,13 +81,13 @@ export default function RaceControls({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.25, duration: 0.3 }}
-              className="flex flex-col items-center px-2.5 pt-1 pb-1
+              className="flex flex-col items-center px-3 sm:px-3.5 pt-1.5 pb-1
                          bg-[#4E342E] rounded-xl border border-white/15"
             >
-              <span className="text-sm leading-none">{MEDALS[2]}</span>
-              <SnailSvg shellColor={SHELL_COLORS[finishOrder[2] % SHELL_COLORS.length]} size={20} />
-              <span className="font-heading font-bold text-[9px] sm:text-[10px] text-white/90
-                               max-w-[48px] sm:max-w-[64px] truncate">
+              <span className="text-base leading-none">{MEDALS[2]}</span>
+              <SnailSvg shellColor={SHELL_COLORS[finishOrder[2] % SHELL_COLORS.length]} size={26} />
+              <span className="font-heading font-bold text-[10px] sm:text-[11px] text-white/90
+                               max-w-[52px] sm:max-w-[68px] truncate mt-0.5">
                 {participants[finishOrder[2]]}
               </span>
             </motion.div>
