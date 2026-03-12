@@ -46,10 +46,18 @@ function parseNames(text: string): {
   return { names, displayNames, tooLongIndices };
 }
 
+const LS_KEY = "snailrace-participants";
+
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
   const [shaking, setShaking] = useState(false);
   const prevTooLongCount = useRef(0);
+
+  // Req 5: localStorage에서 이전 참가자 불러오기
+  useEffect(() => {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved) setText(saved);
+  }, []);
 
   const { names, displayNames, tooLongIndices } = parseNames(text);
   const validCount = Math.min(names.length, 15);
@@ -69,6 +77,7 @@ export default function ParticipantInput({ onStart }: Props) {
 
   function handleStart() {
     if (!canStart) return;
+    localStorage.setItem(LS_KEY, text);
     const finalNames = displayNames.slice(0, 15);
     onStart(finalNames);
   }
@@ -99,6 +108,32 @@ export default function ParticipantInput({ onStart }: Props) {
   function handleClear() {
     setText("");
     prevTooLongCount.current = 0;
+  }
+
+  function handleCleanup() {
+    // 원본 구분자 구조를 보존하면서 유효하지 않은 이름만 제거
+    const tokens = text.split(/([\n,\t]+)/);
+    const cleaned: string[] = [];
+    let validCount = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      if (i % 2 === 1) {
+        // 구분자 토큰 — 이전 이름 토큰이 포함됐을 때만 유지
+        if (cleaned.length > 0) cleaned.push(tokens[i]);
+        continue;
+      }
+      const trimmed = tokens[i].trim();
+      if (!trimmed) continue;
+      if (trimmed.length > 8) continue; // 8자 초과 제거
+      if (validCount >= 15) continue; // 15명 초과 제거
+      if (cleaned.length > 0 && cleaned[cleaned.length - 1].match(/^[\n,\t]+$/)) {
+        // 이미 구분자가 있으면 그대로
+      } else if (cleaned.length > 0) {
+        cleaned.push("\n");
+      }
+      cleaned.push(trimmed);
+      validCount++;
+    }
+    setText(cleaned.join(""));
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -279,6 +314,21 @@ export default function ParticipantInput({ onStart }: Props) {
                 ? "최소 2명의 참가자를 입력해주세요"
                 : "1명 더 입력해주세요!"}
             </p>
+          )}
+          {(hasTooLong || hasExcess) && (
+            <button
+              type="button"
+              onClick={handleCleanup}
+              className="mt-1 inline-flex items-center gap-1 px-3 py-1.5
+                         bg-clay-danger/15 text-clay-danger text-xs font-body font-bold
+                         rounded-xl border-2 border-clay-danger/30
+                         hover:bg-clay-danger/25 transition-colors duration-150 cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              유효하지 않은 인원 지우기
+            </button>
           )}
         </div>
       </div>

@@ -127,6 +127,18 @@
   100% { opacity: 0; transform: translate(-3px, 8px) scale(0.3); }
 }
 
+@keyframes wind-streak {
+  0% { opacity: 0.6; transform: translateX(0) scaleX(1); }
+  50% { opacity: 0.3; transform: translateX(-12px) scaleX(1.5); }
+  100% { opacity: 0; transform: translateX(-24px) scaleX(0.3); }
+}
+
+@keyframes overtake-glow {
+  0% { box-shadow: 0 0 0 rgba(253, 203, 110, 0); background-color: transparent; }
+  30% { box-shadow: 0 0 12px rgba(253, 203, 110, 0.8); background-color: rgba(253, 203, 110, 0.15); }
+  100% { box-shadow: 0 0 0 rgba(253, 203, 110, 0); background-color: transparent; }
+}
+
 .animate-dust { animation: dust-puff 0.5s ease-out forwards; }
 .animate-snail-crawl { animation: snail-crawl 0.4s ease-in-out infinite; }
 .animate-winner-bounce { animation: winner-bounce 0.6s ease-in-out infinite; }
@@ -136,6 +148,8 @@
 .animate-trophy-pulse { animation: trophy-pulse 2s ease-in-out infinite; }
 .animate-slide-up { animation: slide-up 0.5s ease-out forwards; }
 .animate-sweat { animation: sweat-drop 0.7s ease-out forwards; }
+.animate-wind-streak { animation: wind-streak 0.6s ease-out infinite; }
+.animate-overtake-glow { animation: overtake-glow 0.6s ease-out forwards; }
 
 /* ── Reduced Motion ── */
 
@@ -148,7 +162,9 @@
   .animate-trophy-pulse,
   .animate-slide-up,
   .animate-snail-crawl,
-  .animate-sweat {
+  .animate-sweat,
+  .animate-wind-streak,
+  .animate-overtake-glow {
     animation: none !important;
   }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import confetti from "canvas-confetti";
 import { createRaceEngine, type RaceState } from "@/lib/raceEngine";
+import { createSfxEngine, type SfxEngine } from "@/lib/sfx";
 import SnailSvg from "./SnailSvg";
 import RaceHeader from "./RaceHeader";
 import RaceControls from "./RaceControls";
@@ -66,8 +67,18 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const prevFinishCountRef = useRef(0);
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const bgmFadeRef = useRef<number>(0);
+  const sfxRef = useRef<SfxEngine | null>(null);
+  const windRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const prevRankingsRef = useRef<number[]>([]);
+  const rankTagRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
+  const overtakeDebounceRef = useRef(0);
 
   const snailSize = participants.length >= 13 ? 22 : participants.length >= 11 ? 26 : participants.length >= 9 ? 28 : participants.length >= 7 ? 32 : 36;
+
+  const getSfx = useCallback(() => {
+    if (!sfxRef.current) sfxRef.current = createSfxEngine();
+    return sfxRef.current;
+  }, []);
 
   const stopBgm = useCallback(() => {
     cancelAnimationFrame(bgmFadeRef.current);
@@ -109,6 +120,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     setBgmMuted((prev) => {
       const next = !prev;
       localStorage.setItem("snailrace-bgm-muted", next ? "1" : "0");
+      sfxRef.current?.setMuted(next);
       if (next) {
         const audio = bgmRef.current;
         if (audio && !audio.paused) {
@@ -137,6 +149,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
     if (countIntervalRef.current) clearInterval(countIntervalRef.current);
     stopBgm();
     stopConfetti();
+    sfxRef.current?.dispose();
   }, [stopBgm, stopConfetti]);
 
   const fireConfetti = useCallback(() => {
@@ -183,6 +196,11 @@ export default function RaceTrack({ participants, onReset }: Props) {
       if (sweatEl) {
         const gap = leadPos - pos;
         sweatEl.style.display = gap > 15 && pos > 5 ? "block" : "none";
+      }
+      // Wind streaks — leader only
+      const windEl = windRefs.current[i];
+      if (windEl) {
+        windEl.style.display = pos === leadPos && pos > 5 ? "block" : "none";
       }
     }
   }, []);
@@ -235,13 +253,21 @@ export default function RaceTrack({ participants, onReset }: Props) {
           const sweatEl = sweatRefs.current[i];
           if (sweatEl) sweatEl.style.display = "none";
         }
+        // Wind cleanup
+        for (let i = 0; i < participants.length; i++) {
+          const windEl = windRefs.current[i];
+          if (windEl) windEl.style.display = "none";
+        }
         setRaceState(engine.snapshot());
         setIsRacing(false);
-        setTimeout(() => fireConfetti(), 200);
+        setTimeout(() => {
+          fireConfetti();
+          getSfx().playFinishCelebration();
+        }, 200);
       }
     };
     animFrameRef.current = requestAnimationFrame(skipAnimate);
-  }, [isRacing, fireConfetti, fadeOutBgm, participants]);
+  }, [isRacing, fireConfetti, fadeOutBgm, participants, getSfx]);
 
   const startRace = useCallback(() => {
     const winnerId = Math.floor(Math.random() * participants.length);
@@ -261,21 +287,32 @@ export default function RaceTrack({ participants, onReset }: Props) {
     slimeRefs.current = new Array(participants.length).fill(null);
     dustRefs.current = new Array(participants.length).fill(null);
     sweatRefs.current = new Array(participants.length).fill(null);
+    windRefs.current = new Array(participants.length).fill(null);
     frameCountRef.current = 0;
     prevFinishCountRef.current = 0;
+    prevRankingsRef.current = [];
+    rankTagRefs.current.clear();
+    overtakeDebounceRef.current = 0;
     setRaceState(null);
+
+    // Init SFX (lazy) and sync mute state
+    const sfx = getSfx();
+    sfx.setMuted(bgmMuted);
 
     setCountdown(3);
     playBgm();
+    sfx.playCountdownTick();
     let count = 3;
 
     countIntervalRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
+        sfx.playCountdownTick();
       } else {
         setCountdown(null);
         if (countIntervalRef.current) clearInterval(countIntervalRef.current);
+        sfx.playCountdownGo();
 
         setShowGo(true);
         setTimeout(() => setShowGo(false), 600);
@@ -320,6 +357,38 @@ export default function RaceTrack({ participants, onReset }: Props) {
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
           if (finishChanged || frameCountRef.current % 12 === 0 || state.finished) {
             prevFinishCountRef.current = state.finishOrder.length;
+
+            // Overtake detection
+            const finishedSet = new Set(state.finishOrder);
+            const currentRankings = [...state.finishOrder];
+            const remainingSort = participants
+              .map((_, i) => i)
+              .filter((i) => !finishedSet.has(i))
+              .sort((a, b) => state.positions[b] - state.positions[a]);
+            currentRankings.push(...remainingSort);
+
+            if (prevRankingsRef.current.length > 0) {
+              const now = performance.now();
+              for (let ri = 0; ri < currentRankings.length; ri++) {
+                const pIdx = currentRankings[ri];
+                const prevRank = prevRankingsRef.current.indexOf(pIdx);
+                if (prevRank > ri) {
+                  // Overtake detected — add glow class
+                  const tagEl = rankTagRefs.current.get(pIdx);
+                  if (tagEl) {
+                    tagEl.classList.add("animate-overtake-glow");
+                    setTimeout(() => tagEl.classList.remove("animate-overtake-glow"), 600);
+                  }
+                  // SFX with debounce
+                  if (now - overtakeDebounceRef.current > 500) {
+                    overtakeDebounceRef.current = now;
+                    getSfx().playOvertakeChime();
+                  }
+                }
+              }
+            }
+            prevRankingsRef.current = currentRankings;
+
             setRaceState(engine.snapshot());
           }
 
@@ -341,14 +410,19 @@ export default function RaceTrack({ participants, onReset }: Props) {
               if (dustEl) dustEl.style.display = "none";
               const sweatEl = sweatRefs.current[i];
               if (sweatEl) sweatEl.style.display = "none";
+              const windEl = windRefs.current[i];
+              if (windEl) windEl.style.display = "none";
             }
-            setTimeout(() => fireConfetti(), 400);
+            setTimeout(() => {
+              fireConfetti();
+              getSfx().playFinishCelebration();
+            }, 400);
           }
         };
         animFrameRef.current = requestAnimationFrame(animate);
       }
     }, 1000);
-  }, [participants, fireConfetti, updateEffects, playBgm, stopBgm]);
+  }, [participants, fireConfetti, updateEffects, playBgm, stopBgm, getSfx, bgmMuted]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -492,6 +566,10 @@ export default function RaceTrack({ participants, onReset }: Props) {
                     return (
                       <motion.span
                         key={`rank-${participantIdx}`}
+                        ref={(el: HTMLSpanElement | null) => {
+                          if (el) rankTagRefs.current.set(participantIdx, el);
+                          else rankTagRefs.current.delete(participantIdx);
+                        }}
                         layout
                         transition={{ type: "spring", stiffness: 200, damping: 35, mass: 1 }}
                         className={`inline-flex items-center gap-0.5 shrink-0
@@ -687,6 +765,29 @@ export default function RaceTrack({ participants, onReset }: Props) {
                             borderRadius: "50% 50% 50% 50% / 30% 30% 70% 70%",
                             backgroundColor: "#74B9FF",
                             opacity: 0.7,
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Wind streaks (leader only) */}
+                    <div
+                      ref={(el) => { windRefs.current[index] = el; }}
+                      className="absolute right-full top-1/2 -translate-y-1/2 pointer-events-none"
+                      style={{ display: "none" }}
+                    >
+                      {[0, 1, 2, 3, 4].map((w) => (
+                        <span
+                          key={w}
+                          className="absolute animate-wind-streak"
+                          style={{
+                            animationDelay: `${w * 0.12}s`,
+                            top: `${-8 + w * 4}px`,
+                            right: `${4 + w * 3}px`,
+                            width: `${14 + w * 2}px`,
+                            height: "2px",
+                            backgroundColor: "rgba(255,255,255,0.5)",
+                            borderRadius: "1px",
                           }}
                         />
                       ))}

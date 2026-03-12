@@ -19,7 +19,7 @@ const REF_DT = 16.67;
 export function createRaceEngine(config: RaceConfig) {
   const { totalDuration, participantCount, predeterminedWinner } = config;
   const rbScale = config.rubberBandScale ?? 1.0;
-  const finalPhaseStart = totalDuration - 2500;
+  const finalPhaseStart = totalDuration - 4500;
 
   // 뷰포트 기반 러버밴드 파라미터
   const rbDeadzone = 4 + (1 - rbScale) * 4;
@@ -131,13 +131,13 @@ export function createRaceEngine(config: RaceConfig) {
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
-          // 서서히 강해지는 수렴 — 초반엔 거의 안 당기고, 후반에만 강하게
-          const eased = finalProgress * finalProgress * finalProgress;
+          // smoothstep S-curve — 양 끝 기울기 0으로 자연스러운 수렴
+          const eased = finalProgress * finalProgress * (3 - 2 * finalProgress);
           const winTarget = 76 + eased * 24;
           const gap = winTarget - positions[i];
           if (gap > 0) {
-            // finalProgress에 비례하여 수렴 강도 증가 (초반 급가속 방지)
-            const convergence = Math.min(1, 0.001 * dt * (1 + finalProgress * 2));
+            // 수렴 강도: 시간이 길어졌으므로 낮춤
+            const convergence = Math.min(1, 0.0006 * dt * (1 + finalProgress * 2));
             positions[i] += gap * convergence;
           }
         }
@@ -147,11 +147,10 @@ export function createRaceEngine(config: RaceConfig) {
             (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
           const winnerPos = positions[predeterminedWinner];
           const lead = positions[i] - winnerPos;
-          if (lead > 0.5) {
-            // 감속 강도가 finalPhase 진행도에 따라 점진적으로 증가
-            // 초반엔 거의 못 느끼다가, 후반에만 확실히 적용
-            const intensity = finalProgress * finalProgress;
-            const dampFactor = Math.max(0.92, 1 - (lead - 0.5) / 60 * intensity);
+          if (lead > 1.0) {
+            // smoothstep 이징으로 통일 — 부드러운 감속
+            const intensity = finalProgress * finalProgress * (3 - 2 * finalProgress);
+            const dampFactor = Math.max(0.94, 1 - (lead - 1.0) / 80 * intensity);
             movement *= dampFactor;
           }
         }
@@ -220,9 +219,9 @@ export function createRaceEngine(config: RaceConfig) {
     for (let j = 0; j < remaining.length; j++) {
       const r = remaining[j];
       const rank = finishOrder.length; // 현재까지의 총 순위 (0-based)
-      const basePos = 100 - rank * 3;
-      const jitter = (Math.random() - 0.5) * 3; // ±1.5% 랜덤 오프셋
-      positions[r.index] = Math.max(45, basePos + jitter);
+      const basePos = 100 - rank * 1.5;
+      const jitter = (Math.random() - 0.5) * 2; // ±1% 랜덤 오프셋
+      positions[r.index] = Math.max(70, basePos + jitter);
       finishedSet.add(r.index);
       finishOrder.push(r.index);
     }
