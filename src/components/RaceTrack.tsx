@@ -476,7 +476,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-3 h-dvh flex flex-col">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2 sm:py-3 h-full flex flex-col">
 
       {/* Mobile landscape hint */}
       {participants.length >= 8 && !landscapeHintDismissed && (

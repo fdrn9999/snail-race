@@ -182,12 +182,21 @@ export default function Home() {
           </footer>
         </>
       ) : (
-        <main className="min-h-screen">
-          <RaceTrack
-            participants={participants}
-            onReset={() => setParticipants(null)}
-          />
-        </main>
+        <div className="h-dvh flex flex-col">
+          <main className="flex-1 min-h-0">
+            <RaceTrack
+              participants={participants}
+              onReset={() => setParticipants(null)}
+            />
+          </main>
+          <footer className="shrink-0 py-1.5 text-center font-body text-[10px] text-clay-muted/50 space-x-2">
+            <span>Made by 정진호(fdrn9999)</span>
+            <a href="https://github.com/fdrn9999" target="_blank" rel="noopener noreferrer"
+               className="hover:text-clay-muted transition-colors">GitHub</a>
+            <a href="mailto:ckato9173@gmail.com"
+               className="hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
+          </footer>
+        </div>
       )}
     </>
   );
