@@ -95,10 +95,7 @@ export function createSfxEngine(): SfxEngine {
 
   function setMuted(m: boolean) {
     muted = m;
-    if (m && ctx) {
-      ctx.close().catch(() => {});
-      ctx = null;
-    }
+    // AudioContext를 닫지 않음 — 유저 제스처 없이 재생성 불가 방지
   }
 
   function dispose() {

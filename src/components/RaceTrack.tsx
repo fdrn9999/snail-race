@@ -280,6 +280,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
       participantCount: participants.length,
       predeterminedWinner: winnerId,
       rubberBandScale,
+      participantNames: participants,
     });
 
     engineRef.current = engine;

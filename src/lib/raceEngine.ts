@@ -11,10 +11,29 @@ export interface RaceConfig {
   participantCount: number;
   predeterminedWinner: number; // index
   rubberBandScale?: number; // 0~1 — 낮을수록 부드러운 보정 (모바일용). 기본 1.0
+  participantNames?: string[]; // 이름 해시 기반 고유 특성 부여용
 }
 
 /** 기준 프레임 간격 (60fps = 16.67ms) */
 const REF_DT = 16.67;
+
+/** 문자열 → 32비트 정수 해시 */
+function hashName(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  }
+  return h;
+}
+
+/** LCG 시드 기반 유사 난수 생성기 */
+function seededRandom(seed: number): () => number {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
 
 export function createRaceEngine(config: RaceConfig) {
   const { totalDuration, participantCount, predeterminedWinner } = config;
@@ -25,21 +44,35 @@ export function createRaceEngine(config: RaceConfig) {
   const rbDeadzone = 4 + (1 - rbScale) * 4;
   const rbDampRange = 30 + (1 - rbScale) * 15;
 
+  // 이름 해시 기반 고유 특성: 0=스프린터, 1=뒷심형, 2=스피드형, 3=꾸준형
   const snails = Array.from({ length: participantCount }, (_, i) => {
     const isWinner = i === predeterminedWinner;
+    const name = config.participantNames?.[i];
+    const hash = name ? hashName(name) : (Math.random() * 0x7fffffff) | 0;
+    const rand = seededRandom(hash);
+    const traitType = (hash >>> 0) % 4;
+    const cruiseBias  = [0, -0.02, 0.02, 0][traitType];
+    const waveScale   = [1.3, 0.7, 1.0, 0.6][traitType];
+    const surgeScale  = [0.7, 1.4, 1.0, 0.8][traitType];
+    const surgeShift  = [-0.1, 0.15, 0, 0.05][traitType];
+
+    const baseCruise = isWinner
+      ? 0.93 + rand() * 0.03
+      : 0.88 + rand() * 0.07;
+
     return {
-      cruiseRate: isWinner
-        ? 0.93 + Math.random() * 0.03
-        : 0.88 + Math.random() * 0.07,
-      wave1: { freq: 0.3 + Math.random() * 0.4, phase: Math.random() * Math.PI * 2, amp: 0.04 + Math.random() * 0.04 },
-      wave2: { freq: 0.7 + Math.random() * 0.8, phase: Math.random() * Math.PI * 2, amp: 0.02 + Math.random() * 0.03 },
-      wave3: { freq: 1.2 + Math.random() * 1.5, phase: Math.random() * Math.PI * 2, amp: 0.01 + Math.random() * 0.02 },
-      // 극적 역전 서지: 비우승자에게 중반에 간헐적 가속을 부여하는 저주파 파형
+      cruiseRate: isWinner ? baseCruise : Math.max(0.85, Math.min(0.96, baseCruise + cruiseBias)),
+      wave1: { freq: 0.3 + rand() * 0.4, phase: rand() * Math.PI * 2, amp: (0.04 + rand() * 0.04) * waveScale },
+      wave2: { freq: 0.7 + rand() * 0.8, phase: rand() * Math.PI * 2, amp: (0.02 + rand() * 0.03) * waveScale },
+      wave3: { freq: 1.2 + rand() * 1.5, phase: rand() * Math.PI * 2, amp: (0.01 + rand() * 0.02) * waveScale },
       surge: isWinner ? null : {
-        freq: 0.15 + Math.random() * 0.1,       // 매우 느린 주기 (~7-10초)
-        phase: Math.random() * Math.PI * 2,
-        amp: 0.06 + Math.random() * 0.04,        // 최대 ±10% 추가
-        activeRange: [0.25 + Math.random() * 0.1, 0.65 + Math.random() * 0.1] as [number, number],
+        freq: 0.15 + rand() * 0.1,
+        phase: rand() * Math.PI * 2,
+        amp: (0.06 + rand() * 0.04) * surgeScale,
+        activeRange: [
+          Math.max(0.1, 0.25 + rand() * 0.1 + surgeShift),
+          Math.min(0.85, 0.65 + rand() * 0.1 + surgeShift),
+        ] as [number, number],
       },
     };
   });
@@ -80,7 +113,9 @@ export function createRaceEngine(config: RaceConfig) {
 
     smoothProgress = Math.min(smoothProgress + dt / totalDuration, 1);
     const timeSec = elapsed / 1000;
-    const inFinalPhase = elapsed >= finalPhaseStart;
+    // smoothProgress 기반 최종 페이즈 — 프레임 드랍 시 위치와 타이밍 괴리 방지
+    const effectiveElapsed = smoothProgress * totalDuration;
+    const inFinalPhase = effectiveElapsed >= finalPhaseStart;
     const winnerFinished = finishedSet.has(predeterminedWinner);
     const scale = dt / REF_DT;
 
@@ -130,7 +165,7 @@ export function createRaceEngine(config: RaceConfig) {
 
         if (isWinner && inFinalPhase) {
           const finalProgress =
-            (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
+            (effectiveElapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
           // smoothstep S-curve — 양 끝 기울기 0으로 자연스러운 수렴
           const eased = finalProgress * finalProgress * (3 - 2 * finalProgress);
           const winTarget = 76 + eased * 24;
@@ -144,7 +179,7 @@ export function createRaceEngine(config: RaceConfig) {
 
         if (!isWinner && inFinalPhase) {
           const finalProgress =
-            (elapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
+            (effectiveElapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
           const winnerPos = positions[predeterminedWinner];
           const lead = positions[i] - winnerPos;
           if (lead > 1.0) {
@@ -215,13 +250,17 @@ export function createRaceEngine(config: RaceConfig) {
     }
     remaining.sort((a, b) => b.score - a.score);
 
-    // 순위별 위치 분산 — 랜덤 오프셋으로 자연스러운 간격
+    // 현재 위치 기반 도착 위치 보간 — 초반 스킵 시 순간이동 느낌 감소
     for (let j = 0; j < remaining.length; j++) {
       const r = remaining[j];
-      const rank = finishOrder.length; // 현재까지의 총 순위 (0-based)
-      const basePos = 100 - rank * 1.5;
-      const jitter = (Math.random() - 0.5) * 2; // ±1% 랜덤 오프셋
-      positions[r.index] = Math.max(70, basePos + jitter);
+      const rank = finishOrder.length;
+      const currentPos = positions[r.index];
+      const finishTarget = 100 - rank * 1.5;
+      // 레이스 진행도에 비례하여 결승 목표와 현재 위치를 보간
+      const blend = Math.max(0.5, smoothProgress);
+      const basePos = currentPos + (finishTarget - currentPos) * blend;
+      const jitter = (Math.random() - 0.5) * 2;
+      positions[r.index] = Math.max(currentPos, Math.min(100, basePos + jitter));
       finishedSet.add(r.index);
       finishOrder.push(r.index);
     }

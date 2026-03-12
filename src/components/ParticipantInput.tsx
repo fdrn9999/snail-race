@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 
 interface Props {
@@ -51,6 +51,7 @@ const LS_KEY = "snailrace-participants";
 export default function ParticipantInput({ onStart }: Props) {
   const [text, setText] = useState("");
   const [shaking, setShaking] = useState(false);
+  const [truncateToast, setTruncateToast] = useState(false);
   const prevTooLongCount = useRef(0);
 
   // Req 5: localStorage에서 이전 참가자 불러오기
@@ -63,7 +64,7 @@ export default function ParticipantInput({ onStart }: Props) {
   const validCount = Math.min(names.length, 15);
   const hasTooLong = tooLongIndices.size > 0;
   const hasExcess = names.length > 15;
-  const canStart = validCount >= 2 && !hasTooLong && !hasExcess;
+  const canStart = validCount >= 2 && !hasExcess;
 
   // 초과 이름이 새로 생기면 shake 트리거
   useEffect(() => {
@@ -77,8 +78,29 @@ export default function ParticipantInput({ onStart }: Props) {
 
   function handleStart() {
     if (!canStart) return;
-    localStorage.setItem(LS_KEY, text);
-    const finalNames = displayNames.slice(0, 15);
+
+    let processedText = text;
+    // 8자 초과 이름 자동 절삭
+    if (hasTooLong) {
+      const tokens = processedText.split(/([\n,\t]+)/);
+      processedText = tokens.map((token, i) => {
+        if (i % 2 === 1) return token; // 구분자
+        const trimmed = token.trim();
+        if (trimmed.length > 8) {
+          const leading = token.match(/^\s*/)?.[0] || "";
+          const trailing = token.match(/\s*$/)?.[0] || "";
+          return leading + trimmed.substring(0, 8) + trailing;
+        }
+        return token;
+      }).join("");
+      setText(processedText);
+      setTruncateToast(true);
+      setTimeout(() => setTruncateToast(false), 3000);
+    }
+
+    localStorage.setItem(LS_KEY, processedText);
+    const { displayNames: finalDisplayNames } = parseNames(processedText);
+    const finalNames = finalDisplayNames.slice(0, 15);
     onStart(finalNames);
   }
 
@@ -300,7 +322,7 @@ export default function ParticipantInput({ onStart }: Props) {
         <div className="mt-3 space-y-1 text-center" aria-live="polite" aria-relevant="additions removals">
           {hasTooLong && (
             <p className="text-[#E17055] text-xs font-body font-semibold" role="alert">
-              8자를 초과한 이름이 있습니다 — 줄여주세요!
+              8자를 초과한 이름은 시작 시 자동으로 줄여집니다
             </p>
           )}
           {hasExcess && (
@@ -331,6 +353,22 @@ export default function ParticipantInput({ onStart }: Props) {
             </button>
           )}
         </div>
+
+        {/* 자동 절삭 토스트 */}
+        <AnimatePresence>
+          {truncateToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-2 text-center"
+            >
+              <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-clay-accent/15 text-clay-accent text-xs font-body font-bold rounded-xl">
+                긴 이름은 자동으로 8자로 줄였습니다
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
