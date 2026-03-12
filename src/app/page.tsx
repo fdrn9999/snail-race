@@ -1,11 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ParticipantInput from "@/components/ParticipantInput";
 import RaceTrack from "@/components/RaceTrack";
 
 export default function Home() {
   const [participants, setParticipants] = useState<string[] | null>(null);
+
+  const goHome = useCallback(() => setParticipants(null), []);
+
+  // Browser back button: push state when entering race, pop to go home
+  useEffect(() => {
+    if (participants) {
+      window.history.pushState({ race: true }, "");
+    }
+  }, [participants]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setParticipants(null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   return (
     <>
@@ -186,7 +203,7 @@ export default function Home() {
           <main className="flex-1 min-h-0">
             <RaceTrack
               participants={participants}
-              onReset={() => setParticipants(null)}
+              onReset={goHome}
             />
           </main>
           <footer className="shrink-0 py-1.5 text-center font-body text-[10px] text-clay-muted/50 space-x-2">

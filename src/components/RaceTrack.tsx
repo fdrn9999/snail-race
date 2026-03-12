@@ -109,9 +109,9 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
   const playBgm = useCallback(() => {
     stopBgm();
-    if (bgmMuted) return;
     const audio = new Audio("/music/racing.mp3");
     audio.volume = 0.5;
+    audio.muted = bgmMuted;
     bgmRef.current = audio;
     audio.play().catch(() => {/* autoplay blocked — silent fail */});
   }, [stopBgm, bgmMuted]);
@@ -121,23 +121,13 @@ export default function RaceTrack({ participants, onReset }: Props) {
       const next = !prev;
       localStorage.setItem("snailrace-bgm-muted", next ? "1" : "0");
       sfxRef.current?.setMuted(next);
-      if (next) {
-        const audio = bgmRef.current;
-        if (audio && !audio.paused) {
-          audio.pause();
-          audio.currentTime = 0;
-        }
-      } else {
-        if (isRacing) {
-          const audio = new Audio("/music/racing.mp3");
-          audio.volume = 0.5;
-          bgmRef.current = audio;
-          audio.play().catch(() => {});
-        }
+      const audio = bgmRef.current;
+      if (audio) {
+        audio.muted = next;
       }
       return next;
     });
-  }, [isRacing]);
+  }, []);
 
   const stopConfetti = useCallback(() => {
     cancelAnimationFrame(confettiFrameRef.current);
@@ -522,8 +512,22 @@ export default function RaceTrack({ participants, onReset }: Props) {
         <div className="shrink-0 h-10 sm:h-12 bg-gradient-to-b from-[#5D4037] to-[#795548] flex items-center px-2 sm:px-3 gap-1.5 sm:gap-2
                         border-b-[3px] border-[#3E2723] relative overflow-hidden">
 
-          {/* Left: Start label / Skip button */}
-          <div className="shrink-0 z-10">
+          {/* Left: Home + Start label / Skip button */}
+          <div className="shrink-0 z-10 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onReset}
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg
+                         bg-[#4E342E] border border-white/15
+                         text-white/80 hover:text-white hover:bg-[#3E2723]
+                         transition-colors duration-150 cursor-pointer"
+              aria-label="홈으로 돌아가기"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </button>
             {!isRacing && !raceFinished && (
               <span className="font-heading text-xs sm:text-sm font-bold text-white/90 uppercase tracking-widest
                                bg-[#4E342E] px-3 py-1 rounded-lg border border-white/15">
