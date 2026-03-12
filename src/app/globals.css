@@ -193,6 +193,14 @@ body {
   font-family: var(--font-body);
   overflow-x: hidden;
   background: var(--color-clay-bg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 입력 필드는 선택 허용 */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 h1, h2, h3, h4, h5, h6, button {
