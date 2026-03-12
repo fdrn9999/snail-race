@@ -905,7 +905,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 flex items-center justify-center bg-black/50 z-30"
+              className="absolute inset-0 flex items-center justify-center bg-black/50 z-[250]"
             >
               <motion.div
                 key={countdown}
@@ -932,7 +932,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="absolute inset-0 flex items-center justify-center bg-black/40 z-30 pointer-events-none"
+              className="absolute inset-0 flex items-center justify-center bg-black/40 z-[250] pointer-events-none"
             >
               <motion.div
                 initial={{ scale: 3, opacity: 0, rotate: -10 }}
@@ -957,7 +957,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="absolute inset-0 flex items-center justify-center z-30 bg-black/30 backdrop-blur-[2px]"
+              className="absolute inset-0 flex items-center justify-center z-[250] bg-black/30 backdrop-blur-[2px]"
             >
               <RaceControls
                 isRacing={isRacing}

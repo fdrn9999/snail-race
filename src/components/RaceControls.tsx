@@ -30,25 +30,27 @@ export default function RaceControls({
   return (
     <div className="flex flex-col items-center gap-2 sm:gap-3">
 
-      {/* Result board — compact podium + rest */}
+      {/* Result board */}
       {!isRacing && raceState?.finished && participants && finishOrder.length >= 3 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="bg-[#2D3436]/85 backdrop-blur-sm rounded-2xl border-2 border-white/10
-                     px-3 sm:px-4 pt-2.5 pb-2 z-40 relative
-                     flex flex-col items-center gap-2 min-w-[200px] sm:min-w-[260px]"
+          className="bg-gradient-to-b from-[#5D4037] to-[#4E342E] rounded-2xl
+                     border-[3px] border-[#3E2723]
+                     px-3 sm:px-4 pt-2.5 pb-2
+                     flex flex-col items-center gap-2 min-w-[220px] sm:min-w-[280px]
+                     shadow-[inset_-2px_-2px_6px_rgba(0,0,0,0.3),inset_2px_2px_6px_rgba(255,255,255,0.08),4px_4px_0px_rgba(0,0,0,0.2)]"
         >
-          {/* Mini podium — top 3 inline */}
+          {/* Mini podium — top 3 */}
           <div className="flex items-end gap-1.5 sm:gap-2">
             {/* 2nd */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.15, duration: 0.3 }}
-              className="flex flex-col items-center px-2 pt-1 pb-1
-                         bg-white/10 rounded-xl border border-white/15"
+              className="flex flex-col items-center px-2.5 pt-1 pb-1
+                         bg-[#4E342E] rounded-xl border border-white/15"
             >
               <span className="text-sm leading-none">{MEDALS[1]}</span>
               <SnailSvg shellColor={SHELL_COLORS[finishOrder[1] % SHELL_COLORS.length]} size={20} />
@@ -63,8 +65,8 @@ export default function RaceControls({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.05, duration: 0.3 }}
-              className="flex flex-col items-center px-2.5 pt-1 pb-1
-                         bg-clay-gold/25 rounded-xl border border-clay-gold/40 -mt-1"
+              className="flex flex-col items-center px-3 pt-1 pb-1
+                         bg-clay-gold/30 rounded-xl border border-clay-gold/50 -mt-1"
             >
               <span className="text-base leading-none">{MEDALS[0]}</span>
               <SnailSvg shellColor={SHELL_COLORS[finishOrder[0] % SHELL_COLORS.length]} size={24} />
@@ -79,8 +81,8 @@ export default function RaceControls({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.25, duration: 0.3 }}
-              className="flex flex-col items-center px-2 pt-1 pb-1
-                         bg-white/10 rounded-xl border border-white/15"
+              className="flex flex-col items-center px-2.5 pt-1 pb-1
+                         bg-[#4E342E] rounded-xl border border-white/15"
             >
               <span className="text-sm leading-none">{MEDALS[2]}</span>
               <SnailSvg shellColor={SHELL_COLORS[finishOrder[2] % SHELL_COLORS.length]} size={20} />
@@ -99,8 +101,8 @@ export default function RaceControls({
                   key={pIdx}
                   className="inline-flex items-center gap-1 font-body text-[10px] sm:text-[11px]"
                 >
-                  <span className="font-heading font-bold text-white/50 w-3.5 text-right text-[9px]">{i + 4}</span>
-                  <span className="text-white/80 truncate max-w-[52px] sm:max-w-[68px]">{participants[pIdx]}</span>
+                  <span className="font-heading font-bold text-white/45 w-3.5 text-right text-[9px]">{i + 4}</span>
+                  <span className="text-white/75 truncate max-w-[52px] sm:max-w-[68px]">{participants[pIdx]}</span>
                 </span>
               ))}
             </div>
@@ -109,7 +111,7 @@ export default function RaceControls({
       )}
 
       {/* Buttons */}
-      <div className="flex justify-center gap-3 sm:gap-4">
+      <div className="flex justify-center gap-2.5 sm:gap-3">
         {!isRacing && !raceState && countdown === null && (
           <motion.button
             initial={{ scale: 0.8, opacity: 0 }}
@@ -141,8 +143,8 @@ export default function RaceControls({
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.95, y: 2 }}
               onClick={handleRerace}
-              className="py-2.5 px-4 sm:px-5 bg-clay-gold text-clay-border font-heading font-bold
-                         rounded-2xl text-sm sm:text-base border-[3px] border-clay-border
+              className="py-2 px-3.5 sm:px-5 bg-clay-gold text-clay-border font-heading font-bold
+                         rounded-xl sm:rounded-2xl text-sm sm:text-base border-[3px] border-clay-border
                          clay-shadow cursor-pointer
                          hover:brightness-105 transition-all duration-200"
             >
@@ -160,10 +162,11 @@ export default function RaceControls({
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.95, y: 2 }}
               onClick={onReset}
-              className="py-2.5 px-4 sm:px-5 bg-clay-card text-clay-text font-heading font-bold
-                         rounded-2xl text-sm sm:text-base border-[3px] border-clay-border
-                         clay-shadow cursor-pointer
-                         hover:brightness-95 transition-all duration-200"
+              className="py-2 px-3.5 sm:px-5 bg-[#795548] text-white/90 font-heading font-bold
+                         rounded-xl sm:rounded-2xl text-sm sm:text-base border-[3px] border-[#3E2723]
+                         shadow-[inset_-2px_-2px_5px_rgba(0,0,0,0.2),inset_2px_2px_5px_rgba(255,255,255,0.08),3px_3px_0px_rgba(0,0,0,0.15)]
+                         cursor-pointer
+                         hover:brightness-110 transition-all duration-200"
             >
               <span className="flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 sm:w-4 sm:h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
