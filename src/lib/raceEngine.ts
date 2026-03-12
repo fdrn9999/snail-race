@@ -112,7 +112,8 @@ export function createRaceEngine(config: RaceConfig) {
     }
 
     smoothProgress = Math.min(smoothProgress + dt / totalDuration, 1);
-    const timeSec = elapsed / 1000;
+    // 진행도 기반 시간 — 프레임 드랍 시에도 완벽한 결정론적 궤적 보장
+    const timeSec = (smoothProgress * totalDuration) / 1000;
     // smoothProgress 기반 최종 페이즈 — 프레임 드랍 시 위치와 타이밍 괴리 방지
     const effectiveElapsed = smoothProgress * totalDuration;
     const inFinalPhase = effectiveElapsed >= finalPhaseStart;
@@ -163,6 +164,13 @@ export function createRaceEngine(config: RaceConfig) {
 
         positions[i] += movement;
 
+        // Mid-phase winner preparation (50%~80%): 자연스럽게 선두권 진입
+        if (isWinner && !inFinalPhase && smoothProgress >= 0.5 && smoothProgress <= 0.8) {
+          const midProgress = (smoothProgress - 0.5) / 0.3;
+          const midEnvelope = Math.sin(midProgress * Math.PI); // smooth 0→1→0
+          positions[i] += movement * midEnvelope * 0.08; // 최대 8% 추가 이동
+        }
+
         if (isWinner && inFinalPhase) {
           const finalProgress =
             (effectiveElapsed - finalPhaseStart) / (totalDuration - finalPhaseStart);
@@ -201,10 +209,11 @@ export function createRaceEngine(config: RaceConfig) {
         }
       }
 
-      positions[i] = Math.max(0, Math.min(100, positions[i]));
+      positions[i] = Math.max(0, positions[i]);
 
-      if (positions[i] >= 99.5) {
-        const overshoot = positions[i] - 99.5;
+      // 자연스러운 결승선 통과 — 99.5 스냅 제거, 프레임 보간으로 부드럽게 도착
+      if (positions[i] >= 100) {
+        const overshoot = positions[i] - 100;
         positions[i] = 100;
         finishedSet.add(i);
         frameFinishers.push({ index: i, overshoot });
@@ -240,12 +249,12 @@ export function createRaceEngine(config: RaceConfig) {
       finishOrder.push(predeterminedWinner);
     }
 
-    // 나머지: 현재 위치(50%) + 랜덤(50%)으로 순서 결정
-    // 스킵 타이밍에 따른 조작 가능성을 줄이기 위해 랜덤 비중을 높임
+    // 나머지: 현재 위치(80%) + 랜덤(20%)으로 순서 결정
+    // 레이스 중 시각적 순위와 일관된 결과를 보장하기 위해 위치 비중을 높임
     const remaining: { index: number; score: number }[] = [];
     for (let i = 0; i < participantCount; i++) {
       if (!finishedSet.has(i)) {
-        remaining.push({ index: i, score: positions[i] * 0.5 + Math.random() * 50 });
+        remaining.push({ index: i, score: positions[i] * 0.8 + Math.random() * 20 });
       }
     }
     remaining.sort((a, b) => b.score - a.score);

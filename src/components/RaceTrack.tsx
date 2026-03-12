@@ -42,6 +42,8 @@ export default function RaceTrack({ participants, onReset }: Props) {
   const [isRacing, setIsRacing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showGo, setShowGo] = useState(false);
+  const [highlightedSnail, setHighlightedSnail] = useState<number | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hydration-safe: 기본값 false, 마운트 후 localStorage에서 읽기
   const [landscapeHintDismissed, setLandscapeHintDismissed] = useState(false);
@@ -346,7 +348,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
           frameCountRef.current++;
           const finishChanged = state.finishOrder.length !== prevFinishCountRef.current;
-          if (finishChanged || frameCountRef.current % 12 === 0 || state.finished) {
+          if (finishChanged || frameCountRef.current % 5 === 0 || state.finished) {
             prevFinishCountRef.current = state.finishOrder.length;
 
             // Overtake detection
@@ -417,15 +419,21 @@ export default function RaceTrack({ participants, onReset }: Props) {
 
   useEffect(() => cleanup, [cleanup]);
 
-  // BGM 탭 전환 싱크
+  // BGM 탭 전환 싱크 — 복귀 시 오디오 재생 위치를 레이스 진행도와 동기화
   useEffect(() => {
     const handleVisibility = () => {
       const audio = bgmRef.current;
       if (!audio) return;
       if (document.hidden) {
         if (!audio.paused) audio.pause();
-      } else {
-        if (isRacing && !bgmMuted && audio.paused && audio.currentTime > 0) {
+      } else if (isRacing && audio.paused) {
+        // 탭 복귀: 실제 경과 시간에 맞춰 오디오 위치 동기화
+        const raceElapsed = performance.now() - startTimeRef.current;
+        const targetTime = raceElapsed / 1000;
+        if (audio.duration && targetTime < audio.duration) {
+          audio.currentTime = targetTime;
+        }
+        if (!bgmMuted) {
           audio.play().catch(() => {});
         }
       }
@@ -577,6 +585,12 @@ export default function RaceTrack({ participants, onReset }: Props) {
                         }}
                         layout
                         transition={{ type: "spring", stiffness: 200, damping: 35, mass: 1 }}
+                        onClick={() => {
+                          setHighlightedSnail(participantIdx);
+                          if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+                          highlightTimerRef.current = setTimeout(() => setHighlightedSnail(null), 2500);
+                        }}
+                        style={{ cursor: "pointer" }}
                         className={`inline-flex items-center gap-0.5 shrink-0
                           ${isTop3
                             ? `px-1.5 py-0.5 rounded-md
@@ -798,7 +812,7 @@ export default function RaceTrack({ participants, onReset }: Props) {
                       ))}
                     </div>
 
-                    <div className={`relative flex items-center ${isWinner ? "animate-winner-bounce" : ""}`}>
+                    <div className={`relative flex items-center ${isWinner ? "animate-winner-bounce" : ""} ${highlightedSnail === index ? "animate-spotlight" : ""}`}>
                       <div className={`relative ${
                         isWinner ? "animate-winner-glow rounded-2xl"
                         : is2nd ? "animate-silver-glow rounded-2xl"
