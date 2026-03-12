@@ -96,6 +96,26 @@ export default function RaceControls({
         </motion.div>
       )}
 
+      {/* 4th ~ last place */}
+      {!isRacing && raceState?.finished && participants && finishOrder.length > 3 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.3 }}
+          className="flex flex-wrap justify-center gap-x-3 gap-y-1 max-w-xs sm:max-w-sm"
+        >
+          {finishOrder.slice(3).map((pIdx, i) => (
+            <span
+              key={pIdx}
+              className="inline-flex items-center gap-1 font-body text-[11px] sm:text-xs text-white/70"
+            >
+              <span className="font-heading font-bold text-white/40 w-4 text-right">{i + 4}</span>
+              <span className="truncate max-w-[60px] sm:max-w-[80px]">{participants[pIdx]}</span>
+            </span>
+          ))}
+        </motion.div>
+      )}
+
       {/* Buttons */}
       <div className="flex justify-center gap-3 sm:gap-4">
         {!isRacing && !raceState && countdown === null && (
