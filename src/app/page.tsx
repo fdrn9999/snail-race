@@ -9,6 +9,12 @@ export default function Home() {
 
   const goHome = useCallback(() => setParticipants(null), []);
 
+  // Pause AdSense on game screen (no publisher content)
+  useEffect(() => {
+    const adsbygoogle = ((window as any).adsbygoogle = (window as any).adsbygoogle || []);
+    adsbygoogle.pauseAdRequests = participants ? 1 : 0;
+  }, [participants]);
+
   // Browser back button: push state when entering race, pop to go home
   useEffect(() => {
     if (participants) {
@@ -195,6 +201,8 @@ export default function Home() {
             <a href="mailto:ckato9173@gmail.com"
                className="whitespace-nowrap hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
             <span className="text-clay-muted/30">|</span>
+            <a href="/about" className="whitespace-nowrap hover:text-clay-muted transition-colors">소개</a>
+            <a href="/guide" className="whitespace-nowrap hover:text-clay-muted transition-colors">활용 가이드</a>
             <a href="/privacy" className="whitespace-nowrap hover:text-clay-muted transition-colors">개인정보처리방침</a>
           </footer>
         </>
@@ -213,6 +221,8 @@ export default function Home() {
             <a href="mailto:ckato9173@gmail.com"
                className="whitespace-nowrap hover:text-clay-muted transition-colors">ckato9173@gmail.com</a>
             <span className="text-clay-muted/30">|</span>
+            <a href="/about" className="whitespace-nowrap hover:text-clay-muted transition-colors">소개</a>
+            <a href="/guide" className="whitespace-nowrap hover:text-clay-muted transition-colors">활용 가이드</a>
             <a href="/privacy" className="whitespace-nowrap hover:text-clay-muted transition-colors">개인정보처리방침</a>
           </footer>
         </div>
