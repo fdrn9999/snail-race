@@ -31,7 +31,7 @@ export default function RaceControls({
     <div className="flex flex-col items-center gap-2 sm:gap-3">
 
       {/* Result board */}
-      {!isRacing && raceState?.finished && participants && finishOrder.length >= 3 && (
+      {!isRacing && raceState?.finished && participants && finishOrder.length >= 2 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -42,7 +42,7 @@ export default function RaceControls({
                      flex flex-col items-center gap-2 min-w-[220px] sm:min-w-[280px]
                      shadow-[inset_-2px_-2px_6px_rgba(0,0,0,0.3),inset_2px_2px_6px_rgba(255,255,255,0.08),4px_4px_0px_rgba(0,0,0,0.2)]"
         >
-          {/* Mini podium — top 3 */}
+          {/* Mini podium — top 3 (or top 2) */}
           <div className="flex items-end gap-2 sm:gap-3">
             {/* 2nd */}
             <motion.div
@@ -77,6 +77,7 @@ export default function RaceControls({
             </motion.div>
 
             {/* 3rd */}
+            {finishOrder.length >= 3 && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -91,6 +92,7 @@ export default function RaceControls({
                 {participants[finishOrder[2]]}
               </span>
             </motion.div>
+            )}
           </div>
 
           {/* 4th ~ last */}
